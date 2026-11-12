@@ -9,10 +9,34 @@
   </head>
   <body>
     <canvas id="scene"></canvas>
+
     <header id="title">
       <h1>Dubai in Code</h1>
-      <p id="status">Skeleton: zone boxes and landmark anchors. The city arrives in Phase 3.</p>
+      <p id="status">Loading the city…</p>
+      <div id="loading" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100"><div id="loading-bar"></div></div>
     </header>
+
+    <nav id="chips" aria-label="Jump to a landmark">
+      <button type="button" data-landmark="burjKhalifa">Burj Khalifa</button>
+      <button type="button" data-landmark="burjAlArab">Burj Al Arab</button>
+      <button type="button" data-landmark="ainDubai">Ain Dubai</button>
+      <button type="button" data-landmark="cayan">Cayan Tower</button>
+      <button type="button" data-landmark="museumFuture">Museum of the Future</button>
+    </nav>
+
+    <section id="panel" aria-label="Controls">
+      <label id="time-label" for="time">
+        <span>Noon</span>
+        <input id="time" type="range" min="0" max="1" step="0.001" value="0.5" aria-label="Time of day, noon to night" />
+        <span>Night</span>
+      </label>
+      <button type="button" id="tour">Play tour</button>
+      <div id="quality" role="group" aria-label="Quality">
+        <button type="button" data-quality="low">Low</button>
+        <button type="button" data-quality="high" aria-pressed="true">High</button>
+      </div>
+    </section>
+
     <footer id="credit">
       <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
     </footer>

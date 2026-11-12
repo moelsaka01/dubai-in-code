@@ -138,7 +138,10 @@ void main() {
     float lit = sunLit(outside);
     vec4 info = cityInfo(outside);
     float ao = cityAO(vWorldPos, info) * mix(0.75, 1.0, smoothstep(0.0, 10.0, y));
-    vec3 wall = shade(wallAlbedo, n, lit, ao * (1.0 - 0.45 * under));
+    // Piers between bays: tilt the normal on either side of each bay line so the wall has relief in raking light.
+    vec3 along = vec3(n.z, 0.0, -n.x); // the direction aUv.x grows in
+    float pier = ((1.0 - smoothstep(0.0, 0.07, f.x)) - smoothstep(0.93, 1.0, f.x)) * detail * typical * (1.0 - glass * s3);
+    vec3 wall = shade(wallAlbedo, normalize(n + along * (pier * 0.7)), lit, ao * (1.0 - 0.45 * under));
 
     // Glass: a mirror of the sky and the city, each pane tilted a hair so a facade does not reflect as one sheet.
     vec3 R = reflect(-V, n);
@@ -146,11 +149,35 @@ void main() {
     float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
     vec3 mirror = envColor(R) * mix(0.75, 1.0, ao);
     vec3 tint = mix(vec3(1.0), vColor * 3.0, glass * 0.55);
-    vec3 interior = mix(vec3(0.020, 0.024, 0.030), vec3(0.16, 0.15, 0.13), step(0.72, h2) * detail * (1.0 - glass));
-    interior = mix(interior, vColor * 0.30, glass); // tinted glass has a body colour of its own
+    // A room behind every window (interior mapping): cast the view ray into a box one bay wide, one floor high
+    // and five metres deep, and shade whichever surface it hits. Windows get depth and parallax for a few
+    // lines of arithmetic, with no geometry.
+    // Skipped where no window is resolved: most of the screen is far walls.
+    float room = 0.55, curtain = 0.0;
+    if (detail > 0.001 && win > 0.001) {
+      vec3 rd = vec3(-dot(V, along), -V.y, max(dot(V, n), 0.02)); // z runs into the building
+      vec3 size = vec3(3.1 * mix(1.0, 0.5, glass * s1), floorH, 5.0);
+      vec3 ro = vec3(f.x, f.y, 0.0) * size;
+      vec3 reach = (step(0.0, rd) * size - ro) / (rd + sign(rd) * 1e-4 + 1e-5);
+      float th = min(reach.x, min(reach.y, reach.z));
+      vec3 hit = ro + rd * th;
+      float isBack = step(reach.z, min(reach.x, reach.y));
+      float isLevel = (1.0 - isBack) * step(reach.y, reach.x);
+      float surface = mix(0.62, 0.8, isBack);                    // side walls, back wall
+      surface = mix(surface, mix(0.38, 1.0, step(0.0, rd.y)), isLevel); // floor, ceiling
+      vec2 bw = hit.xy / size.xy;
+      surface *= 1.0 - 0.35 * isBack * step(hash21(cell * 3.3 + floor(bw * vec2(3.0, 2.0)) + vSeed), 0.35) * step(bw.y, 0.55); // furniture, doors
+      curtain = step(0.7, hash21(cell * 4.1 + vSeed * 2.3)) * detail; // some have blinds drawn
+      room = mix(mix(0.55, surface / (1.0 + th * 0.22), detail), 0.7, curtain);
+    }
+    vec3 roomTint = mix(vec3(0.72, 0.68, 0.60), vec3(0.58, 0.62, 0.68), h2);
+    vec3 interior = roomTint * room * mix(0.16, 0.5, curtain);
+    interior = mix(interior, interior * 0.6 + vColor * 0.16, glass); // tinted glass has a body colour of its own
     float reflectance = mix(0.5, 0.9, glass) * (0.5 + 0.5 * fres);
     vec3 glassCol = shade(interior, n, lit, ao) * (1.0 - 0.4 * under) + mirror * tint * reflectance;
     glassCol += uLightColor * (pow(max(dot(R, uLightDir), 0.0), 64.0) * lit * mix(0.5, 1.3, glass));
+    // Reveal: the glass sits back from the wall face, so the head of a punched window is in shade.
+    glassCol *= 1.0 - 0.5 * smoothstep(0.78, 0.97, (f.y - lo.y) / max(hi.y - lo.y, 0.01)) * plain * detail * typical;
     col = mix(wall, glassCol, win);
 
     // Night: lit rooms. Per window up close, in blocks of rooms at mid distance, a dim average far away,
@@ -166,7 +193,7 @@ void main() {
     vec3 lamp = mix(mix(warm, cool, coolShare), mix(warm, cool, step(h2, coolShare)), detail);
     float bright = mix(0.42, 0.12 + 1.5 * h3 * h3 * h3 * h3, detail) * mix(1.0, 0.5, glass);
     float nightAmt = pow(uNight, 0.7);
-    col += lamp * (litRooms * win * typical * bright * nightAmt * 1.5);
+    col += lamp * (litRooms * win * typical * bright * nightAmt * 1.5 * mix(1.0, room * 1.9, detail));
     col += warm * (shopLit * nightAmt * 0.9);
     // Street lighting washes the first floors, more where the city is dense.
     col += wallAlbedo * vec3(1.0, 0.6, 0.3) * (0.14 * uNight * exp(-y / 9.0) * (0.35 + 0.65 * info.a));

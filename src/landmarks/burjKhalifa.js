@@ -80,6 +80,7 @@ export function create(env) {
         float spire = smoothstep(700.0, 735.0, y);
         albedo = mix(mix(glass, steel, frame), steel, spire);
         gloss = mix(mix(0.9, 0.35, frame), 0.5, spire);
+        metal = 0.5 * (1.0 - frame); // coated glass: it mirrors the sky at every angle, which is what makes the tower silver-blue
 
         vec2 cell = floor(g);
         float share = uLitFraction * 0.35;

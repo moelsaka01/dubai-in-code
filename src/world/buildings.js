@@ -37,14 +37,17 @@ export function createBuildings(env) {
       mesh.updateMatrix();
       mesh.matrixAutoUpdate = false;
       group.add(mesh);
-      tiles.push({ mesh, all: d.index.length, tall: d.tallIndexCount, centre: new THREE.Vector3(...d.center).add(mesh.position), radius: d.radius });
+      tiles.push({ mesh, all: d.index.length, body: d.bodyIndexCount, tall: d.tallIndexCount, centre: new THREE.Vector3(...d.center).add(mesh.position), radius: d.radius });
     },
-    /** @param {number} lodFar distance (m) beyond which a tile shows only its tall buildings */
-    update(camera, lodFar) {
+    /**
+     * @param {number} lodFar distance (m) beyond which a tile shows only its tall buildings
+     * @param {number} plantFar distance (m) within which a tile also draws its roof plant
+     */
+    update(camera, lodFar, plantFar = Infinity) {
       beacons.update();
       for (const t of tiles) {
-        const far = centre.copy(t.centre).sub(camera.position).length() - t.radius > lodFar;
-        const count = far ? t.tall : t.all;
+        const d = centre.copy(t.centre).sub(camera.position).length() - t.radius;
+        const count = d > lodFar ? t.tall : (d > plantFar ? t.body : t.all);
         t.mesh.visible = count > 0;
         t.mesh.geometry.setDrawRange(0, count);
       }

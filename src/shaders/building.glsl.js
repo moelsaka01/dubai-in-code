@@ -1,15 +1,20 @@
 // The one building shader, shared by every tile.
-// Attributes: aNormal (xyz + kind/127), aUv (x in whole window bays along the wall, y in metres above ground),
-// aColor (sRGB palette colour + seed/255).
+// Attributes: aNormal (xyz + kind/127), aUv (x: whole window bays along the wall, y: metres above ground,
+// z: top of this volume in metres), aColor (sRGB palette colour + seed/255).
+//
+// What it draws, all from those few numbers: four facade types per building kind (punched windows, ribbon
+// glazing, balconies, curtain wall / fins), a shopfront floor, a plant floor and parapet at the top, glass that
+// mirrors the sky above and the city below with every pane tilted slightly, weathering, roof plant, sun shadows
+// and occlusion from the city maps, and lit rooms at night.
 import { COMMON, OUTPUT } from './common.glsl.js';
 
 export const buildingVertex = /* glsl */ `
 attribute vec4 aNormal;
-attribute vec2 aUv;
+attribute vec3 aUv;
 attribute vec4 aColor;
 varying vec3 vWorldPos;
 varying vec3 vNormal;
-varying vec2 vUv;
+varying vec3 vUv;
 varying vec3 vColor;
 varying float vSeed;
 varying float vKind;
@@ -30,7 +35,7 @@ export const buildingFragment = /* glsl */ `
 ${COMMON}
 varying vec3 vWorldPos;
 varying vec3 vNormal;
-varying vec2 vUv;
+varying vec3 vUv;
 varying vec3 vColor;
 varying float vSeed;
 varying float vKind;
@@ -42,67 +47,129 @@ float kindIs(float k) {
 void main() {
   vec3 n = normalize(vNormal);
   vec3 V = normalize(cameraPosition - vWorldPos);
+  // Clamped: under MSAA a varying can be extrapolated far outside its range on an edge-on triangle.
+  float y = max(vUv.y, 0.0);
+  float top = max(vUv.z, y);
+  float villa = kindIs(3.0);
   vec3 col;
 
   if (abs(n.y) > 0.5) {
-    // Roofs and undersides.
-    col = shadeLambert(vColor, n);
+    // ---- roofs and undersides ----
+    vec4 info = cityInfo(vWorldPos);
+    float lit = sunLit(vWorldPos + vec3(0.0, 1.5, 0.0));
+    vec3 albedo = vColor;
+    vec2 rc = vWorldPos.xz / 2.8;
+    vec2 rw = fwidth(rc);
+    float near = 1.0 - smoothstep(0.3, 0.9, max(rw.x, rw.y));
+    vec2 rcell = floor(rc), rf = fract(rc);
+    float rh = hash21(rcell + vSeed);
+    // Plant: chillers, tanks and lift overruns scattered over flat roofs.
+    float unit = step(0.84, rh) * step(0.18, rf.x) * step(rf.x, 0.82) * step(0.18, rf.y) * step(rf.y, 0.82) * (1.0 - villa);
+    albedo = mix(albedo, albedo * mix(0.5, 1.45, hash21(rcell * 1.7 + 3.0)), unit * near);
+    // Tiled villa roofs: ridges.
+    albedo *= mix(1.0, 0.84 + 0.16 * sin(dot(vWorldPos.xz, vec2(0.8, 0.6)) * 2.4), villa * near);
+    albedo *= 0.86 + 0.26 * vnoise(vWorldPos.xz * 0.16 + vSeed);
+    col = shade(albedo, n, lit, cityAO(vWorldPos, info));
   } else {
+    // ---- walls ----
     float glass = kindIs(1.0);
-    float villa = kindIs(3.0);
     float civic = kindIs(6.0);
     float hasWin = 1.0 - max(kindIs(4.0), kindIs(7.0)); // sheds and canopies have none
+    float seedA = hash11(vSeed * 1.31 + 3.0);
+    float style = floor(hash11(vSeed * 2.77 + 9.0) * 4.0);
+    float s1 = 1.0 - step(0.5, abs(style - 1.0));
+    float s2 = 1.0 - step(0.5, abs(style - 2.0));
+    float s3 = 1.0 - step(0.5, abs(style - 3.0));
+    float plain = (1.0 - glass) * (1.0 - villa) * (1.0 - civic);
 
-    // Window rectangle inside one bay x one floor, per kind.
-    vec2 lo = vec2(0.18, 0.30), hi = vec2(0.82, 0.80);
-    lo = mix(lo, vec2(0.04, 0.10), glass);  hi = mix(hi, vec2(0.96, 0.92), glass);
-    lo = mix(lo, vec2(0.30, 0.35), villa);  hi = mix(hi, vec2(0.70, 0.75), villa);
-    lo = mix(lo, vec2(0.36, 0.22), civic);  hi = mix(hi, vec2(0.64, 0.86), civic);
-
-    float floorH = mix(3.2, 3.9, glass);
-    vec2 g = vec2(vUv.x, vUv.y / floorH);
+    float floorH = mix(3.3, 3.9, glass);
+    vec2 g = vec2(vUv.x * mix(1.0, 2.0, glass * s1), y / floorH); // fin facades have half-width bays
     vec2 cell = floor(g);
     vec2 f = fract(g);
     vec2 fw = max(fwidth(g), vec2(1e-4));
-    // 1 near the camera, 0 where a window is smaller than about a pixel: there we draw the average instead.
+    // 1 near the camera, 0 where a window is smaller than about a pixel: there we draw averages instead.
     float detail = 1.0 - smoothstep(0.25, 0.7, max(fw.x, fw.y));
 
+    // Window rectangle inside one bay x one floor.
+    vec2 lo = vec2(0.20, 0.28), hi = vec2(0.80, 0.78);                         // punched
+    lo = mix(lo, vec2(-0.2, 0.34), plain * s1);  hi = mix(hi, vec2(1.2, 0.80), plain * s1);  // ribbon
+    lo = mix(lo, vec2(0.10, 0.08), plain * s2);  hi = mix(hi, vec2(0.90, 0.72), plain * s2);  // balcony doors
+    lo = mix(lo, vec2(0.12, 0.20), plain * s3);  hi = mix(hi, vec2(0.88, 0.84), plain * s3);  // large punched
+    lo = mix(lo, vec2(0.03, 0.08), glass);       hi = mix(hi, vec2(0.97, 0.92), glass);       // curtain wall
+    lo = mix(lo, vec2(0.12, 0.04), glass * s1);  hi = mix(hi, vec2(0.88, 0.96), glass * s1);  // fins
+    lo = mix(lo, vec2(-0.2, 0.30), glass * s2);  hi = mix(hi, vec2(1.2, 0.92), glass * s2);   // glass ribbon
+    lo = mix(lo, vec2(0.015, 0.03), glass * s3); hi = mix(hi, vec2(0.985, 0.97), glass * s3); // monolith
+    lo = mix(lo, vec2(0.30, 0.35), villa);       hi = mix(hi, vec2(0.70, 0.75), villa);
+    lo = mix(lo, vec2(0.36, 0.22), civic);       hi = mix(hi, vec2(0.64, 0.86), civic);
+
     vec2 e = smoothstep(lo - fw, lo + fw, f) * (1.0 - smoothstep(hi - fw, hi + fw, f));
-    float cover = (hi.x - lo.x) * (hi.y - lo.y);
-    float aboveGround = mix(smoothstep(3.4, 4.2, vUv.y), 1.0, villa);
-    float win = mix(cover, e.x * e.y, detail) * hasWin * aboveGround;
+    float cover = (min(hi.x, 1.0) - max(lo.x, 0.0)) * (hi.y - lo.y);
+
+    // Zones up the wall: shopfront, typical floors, plant floor, parapet.
+    float tower = step(70.0, top);
+    float parapet = step(top - 1.1, y);
+    float plant = tower * step(top - 1.1 - floorH * 1.6, y) * (1.0 - parapet);
+    float ground = (1.0 - step(4.4, y)) * (1.0 - villa);
+    float typical = (1.0 - ground) * (1.0 - parapet) * (1.0 - plant);
+    float win = mix(cover, e.x * e.y, detail) * hasWin * typical;
+    float posts = smoothstep(0.03, 0.03 + fw.x, f.x) * (1.0 - smoothstep(0.97 - fw.x, 0.97, f.x));
+    float shop = ground * hasWin * smoothstep(0.5, 0.7, y) * (1.0 - smoothstep(3.7, 3.9, y)) * mix(0.9, posts, detail);
+    win = max(win, shop);
 
     float h1 = hash21(cell + vSeed * 7.13);
     float h2 = hash21(cell * 1.7 + vSeed * 3.71 + 11.0);
     float h3 = hash21(cell * 2.3 + vSeed * 1.9 + 5.0);
-    float pane = mix(1.0, 0.8 + 0.4 * h2, detail);
 
-    // Day: wall with a base darkening, glass that reflects the sky.
-    float ao = mix(0.6, 1.0, smoothstep(0.0, 12.0, vUv.y));
-    vec3 wallAlbedo = mix(vColor, vColor * 0.35, glass); // curtain-wall mullions are dark
-    vec3 wall = shadeLambert(wallAlbedo * ao, n);
+    // Wall material: mullions on glass towers, weathered render or stone elsewhere.
+    vec3 wallAlbedo = mix(vColor, vColor * 0.4, glass);
+    wallAlbedo = mix(wallAlbedo, vColor * 0.85, glass * s2);             // spandrel panels between glass ribbons
+    wallAlbedo *= 0.84 + 0.24 * vnoise(vec2(vUv.x * 0.37, y * 0.11) + vSeed);
+    float joint = (1.0 - smoothstep(0.0, 0.05 + fw.y, f.y)) * detail * (1.0 - glass);
+    wallAlbedo *= 1.0 - 0.16 * joint * typical;                          // floor joints
+    float slab = smoothstep(0.84 - fw.y, 0.84 + fw.y, f.y) * plain * s2 * typical * detail;
+    wallAlbedo = mix(wallAlbedo, vColor * 1.12, slab);                   // balcony slab edges catch the light
+    float under = smoothstep(0.50, 0.84, f.y) * (1.0 - slab) * plain * s2 * typical * detail;
+    float louvre = 0.55 + 0.3 * step(0.5, fract(y * 2.2));
+    wallAlbedo *= mix(1.0, mix(0.7, louvre, detail), plant);
+    wallAlbedo *= mix(1.0, 1.1, parapet);
+
+    // Light: sample the city maps a little outside our own footprint.
+    vec3 outside = vWorldPos + n * 9.0;
+    float lit = sunLit(outside);
+    vec4 info = cityInfo(outside);
+    float ao = cityAO(vWorldPos, info) * mix(0.75, 1.0, smoothstep(0.0, 10.0, y));
+    vec3 wall = shade(wallAlbedo, n, lit, ao * (1.0 - 0.45 * under));
+
+    // Glass: a mirror of the sky and the city, each pane tilted a hair so a facade does not reflect as one sheet.
     vec3 R = reflect(-V, n);
-    vec3 sky = skyColor(normalize(vec3(R.x, abs(R.y) * 0.7 + 0.05, R.z)));
-    float fres = 0.05 + 0.95 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
-    vec3 tint = mix(vec3(0.05, 0.065, 0.08), vColor * 0.55, glass);
-    vec3 glassCol = shadeLambert(tint, n) * pane + sky * mix(0.22, 0.42, glass) * (0.4 + 0.6 * fres) * pane * mix(vec3(1.0), vColor * 2.2, glass * 0.5);
-    glassCol += uLightColor * pow(max(dot(R, uLightDir), 0.0), 48.0) * mix(0.35, 0.9, glass) * pane;
+    R = normalize(R + (vec3(h1, h2, h3) - 0.5) * (0.07 * detail));
+    float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
+    vec3 mirror = envColor(R) * mix(0.75, 1.0, ao);
+    vec3 tint = mix(vec3(1.0), vColor * 3.0, glass * 0.55);
+    vec3 interior = mix(vec3(0.020, 0.024, 0.030), vec3(0.16, 0.15, 0.13), step(0.72, h2) * detail * (1.0 - glass));
+    interior = mix(interior, vColor * 0.30, glass); // tinted glass has a body colour of its own
+    float reflectance = mix(0.5, 0.9, glass) * (0.5 + 0.5 * fres);
+    vec3 glassCol = shade(interior, n, lit, ao) * (1.0 - 0.4 * under) + mirror * tint * reflectance;
+    glassCol += uLightColor * (pow(max(dot(R, uLightDir), 0.0), 64.0) * lit * mix(0.5, 1.3, glass));
     col = mix(wall, glassCol, win);
 
-    // Night: lit windows. Each building has its own share of lit rooms, a few floors are fully lit.
-    float chance = clamp(uLitFraction * (0.15 + 0.7 * hash11(vSeed * 1.31 + 3.0)), 0.0, 0.97);
+    // Night: lit rooms. Per window up close, in blocks of rooms at mid distance, a dim average far away,
+    // so distant buildings stay dark shapes with lights on them instead of turning into grey boxes.
+    float chance = clamp(uLitFraction * (0.15 + 0.7 * seedA), 0.0, 0.97);
     chance = mix(chance, max(chance, 0.85), step(0.95, hash11(cell.y * 13.7 + vSeed * 5.3)) * step(0.05, uLitFraction));
-    float lit = mix(chance, step(h1, chance), detail);
-    float coolShare = mix(0.15, 0.6, glass);
-    vec3 warm = vec3(1.0, 0.72, 0.40), cool = vec3(0.76, 0.87, 1.0);
+    float blockDetail = 1.0 - smoothstep(0.25, 0.7, max(fw.x, fw.y) / 3.0);
+    float blockLit = step(hash21(floor(g / 3.0) + vSeed * 5.1), chance * 0.7);
+    float litRooms = mix(mix(chance * 0.4, blockLit, blockDetail), step(h1, chance), detail);
+    float shopLit = step(0.3, hash11(cell.x * 3.1 + vSeed)) * shop;
+    float coolShare = mix(0.08, 0.4, glass);
+    vec3 warm = vec3(1.0, 0.68, 0.36), cool = vec3(0.78, 0.88, 1.0);
     vec3 lamp = mix(mix(warm, cool, coolShare), mix(warm, cool, step(h2, coolShare)), detail);
-    // Most lit rooms are dim, a few are bright enough to bloom; the far average matches the near pattern.
-    float bright = mix(0.42, 0.12 + 1.5 * h3 * h3 * h3 * h3, detail) * mix(1.0, 0.45, glass);
+    float bright = mix(0.42, 0.12 + 1.5 * h3 * h3 * h3 * h3, detail) * mix(1.0, 0.5, glass);
     float nightAmt = pow(uNight, 0.7);
-    col += lamp * (lit * win * bright * nightAmt * 1.5);
-    // Street lighting washes the first floors. The height is clamped: under MSAA a varying can be extrapolated
-    // far below zero on a wall seen edge-on, and exp() of that overflows and floods the bloom pass.
-    col += wallAlbedo * vec3(1.0, 0.6, 0.3) * (0.12 * uNight * exp(-max(vUv.y, 0.0) / 9.0));
+    col += lamp * (litRooms * win * typical * bright * nightAmt * 1.5);
+    col += warm * (shopLit * nightAmt * 0.9);
+    // Street lighting washes the first floors, more where the city is dense.
+    col += wallAlbedo * vec3(1.0, 0.6, 0.3) * (0.14 * uNight * exp(-y / 9.0) * (0.35 + 0.65 * info.a));
   }
 
   col = applyFog(col, vWorldPos);

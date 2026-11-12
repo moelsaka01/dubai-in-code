@@ -4,6 +4,7 @@
 import earcut from 'earcut';
 import { decodeTile, decodeLand } from '../shared/format.js';
 import { TILE_SIZE, GRID_MIN } from '../shared/config.js';
+import { buildBuildings } from './buildingMesh.js';
 
 const LAND_Y = 1.5; // top of the land slab
 const COVER_Y = 1.55; // parks and beaches
@@ -106,133 +107,6 @@ class Bounds {
   }
 }
 
-// ---------- buildings ----------
-
-// sRGB bytes; the shader squares them as a cheap decode. Indexed by `kind` (PLAN §2 step 6).
-const WALLS = [
-  [[222, 210, 188], [214, 204, 186], [230, 222, 206], [204, 196, 182], [196, 186, 170], [226, 214, 196]], // 0 generic
-  [[104, 146, 172], [92, 136, 158], [126, 158, 170], [86, 118, 150], [136, 162, 158], [118, 134, 150], [150, 140, 120]], // 1 glass tower
-  [[226, 214, 192], [232, 224, 208], [214, 198, 172], [220, 206, 190], [236, 228, 214]], // 2 residential
-  [[238, 230, 214], [232, 220, 200], [240, 236, 226], [226, 212, 188]], // 3 villa
-  [[190, 192, 194], [206, 206, 200], [176, 184, 190], [214, 210, 200]], // 4 industrial
-  [[224, 214, 198], [214, 206, 196], [230, 224, 214]], // 5 retail
-  [[232, 222, 198], [240, 234, 220], [222, 206, 176]], // 6 civic / mosque
-  [[200, 200, 198], [214, 212, 206]], // 7 roof / canopy
-];
-const ROOF_GREY = [[168, 164, 156], [182, 178, 170], [150, 148, 144], [196, 190, 180]];
-const ROOF_TILE = [[176, 112, 84], [160, 100, 78], [188, 126, 96]];
-const ROOF_METAL = [[200, 202, 204], [152, 162, 172], [214, 214, 210]];
-const ROOF_TOWER = [[92, 94, 98], [112, 112, 114], [78, 82, 88]];
-
-function colors(kind, seed) {
-  const pal = WALLS[kind] || WALLS[0];
-  const w = pal[seed % pal.length];
-  const j = 0.92 + 0.16 * (((seed * 37) % 64) / 63);
-  let r;
-  if (kind === 3) r = seed % 5 < 3 ? ROOF_TILE[seed % 3] : [214, 206, 192];
-  else if (kind === 4) r = ROOF_METAL[seed % 3];
-  else if (kind === 1) r = ROOF_TOWER[seed % 3];
-  else if (kind === 7) r = w;
-  else r = ROOF_GREY[seed % 4];
-  return { wall: [w[0] * j, w[1] * j, w[2] * j], roof: r };
-}
-
-function buildBuildings(list, nTall, e0, n0) {
-  // Pass 1: clean rings, triangulate roofs, count.
-  const prep = new Array(list.length);
-  let nVert = 0, nIdx = 0;
-  for (let i = 0; i < list.length; i++) {
-    const b = list[i];
-    const outer = normRing(b.rings[0], false);
-    if (!outer) continue;
-    const rings = [outer];
-    for (let k = 1; k < b.rings.length; k++) {
-      const h = normRing(b.rings[k], true);
-      if (h) rings.push(h);
-    }
-    const tri = triangulate(rings);
-    let y0 = b.minHeight;
-    if (b.kind === 7) y0 = Math.max(y0, b.height - 0.6); // canopies are thin slabs
-    if (y0 >= b.height) y0 = Math.max(0, b.height - 3);
-    const caps = y0 > 0.5 ? 2 : 1; // an underside when the volume floats
-    nVert += tri.n * 4 + tri.n * caps;
-    nIdx += tri.n * 6 + tri.tris.length * caps;
-    prep[i] = { b, rings, tri, y0, caps };
-  }
-
-  const pos = new Float32Array(nVert * 3);
-  const nor = new Int8Array(nVert * 4);
-  const uv = new Float32Array(nVert * 2);
-  const col = new Uint8Array(nVert * 4);
-  const idx = new Uint32Array(nIdx);
-  const bounds = new Bounds();
-  const beacons = [];
-  let v = 0, ii = 0, tallIndexCount = 0;
-
-  const put = (x, y, z, nx, ny, nz, kind, u, w, c, seed) => {
-    pos[v * 3] = x; pos[v * 3 + 1] = y; pos[v * 3 + 2] = z;
-    nor[v * 4] = nx; nor[v * 4 + 1] = ny; nor[v * 4 + 2] = nz; nor[v * 4 + 3] = kind;
-    uv[v * 2] = u; uv[v * 2 + 1] = w;
-    col[v * 4] = c[0]; col[v * 4 + 1] = c[1]; col[v * 4 + 2] = c[2]; col[v * 4 + 3] = seed;
-    return v++;
-  };
-
-  for (let i = 0; i < list.length; i++) {
-    if (i === nTall) tallIndexCount = ii;
-    const p = prep[i];
-    if (!p) continue;
-    const { b, rings, tri, y0 } = p;
-    const h = b.height, kind = b.kind, seed = b.seed;
-    const c = colors(kind, seed);
-
-    // Walls. For a plan edge (de, dn) on a CCW ring the outward normal is (dn, -de), which is (dn, 0, de) in the scene.
-    let cum = seed % 7;
-    for (const r of rings) {
-      const n = r.length / 2;
-      for (let j = 0; j < n; j++) {
-        const k = (j + 1) % n;
-        const ax = r[2 * j], an = r[2 * j + 1], bx = r[2 * k], bn = r[2 * k + 1];
-        const de = bx - ax, dn = bn - an;
-        const len = Math.hypot(de, dn) || 1;
-        const nx = Math.round((dn / len) * 127), nz = Math.round((de / len) * 127);
-        const bays = len < 2 ? 0 : Math.max(1, Math.round(len / BAY)); // whole bays per wall, so windows never straddle a corner
-        const u0 = cum, u1 = cum + bays;
-        cum = u1;
-        const a = put(ax, y0, -an, nx, 0, nz, kind, u0, y0, c.wall, seed);
-        put(bx, y0, -bn, nx, 0, nz, kind, u1, y0, c.wall, seed);
-        put(bx, h, -bn, nx, 0, nz, kind, u1, h, c.wall, seed);
-        put(ax, h, -an, nx, 0, nz, kind, u0, h, c.wall, seed);
-        idx[ii++] = a; idx[ii++] = a + 1; idx[ii++] = a + 2;
-        idx[ii++] = a; idx[ii++] = a + 2; idx[ii++] = a + 3;
-      }
-    }
-
-    // Roof, and an underside for floating volumes.
-    const { flat, tris, n } = tri;
-    const base = v;
-    let cx = 0, cz = 0;
-    for (let j = 0; j < n; j++) {
-      const x = flat[2 * j], z = flat[2 * j + 1];
-      put(x, h, z, 0, 127, 0, kind, 0, h, c.roof, seed);
-      bounds.add(x, h, z);
-      bounds.add(x, y0, z);
-      cx += x; cz += z;
-    }
-    for (let t = 0; t < tris.length; t++) idx[ii++] = base + tris[t];
-    if (p.caps === 2) {
-      const under = v;
-      for (let j = 0; j < n; j++) put(flat[2 * j], y0, flat[2 * j + 1], 0, -127, 0, kind, 0, y0, c.wall, seed);
-      for (let t = 0; t < tris.length; t += 3) {
-        idx[ii++] = under + tris[t]; idx[ii++] = under + tris[t + 2]; idx[ii++] = under + tris[t + 1];
-      }
-    }
-    if (h >= 150) beacons.push(e0 + cx / n, h + 4, -n0 + cz / n);
-  }
-  if (nTall >= list.length) tallIndexCount = ii;
-
-  return { position: pos, normal: nor, uv, color: col, index: idx, tallIndexCount, ...bounds.sphere(), beacons: new Float32Array(beacons) };
-}
-
 // ---------- roads ----------
 
 function halfWidth(r) {
@@ -315,7 +189,7 @@ function buildRoads(list, e0, n0) {
 
 function buildTile(tile) {
   const e0 = GRID_MIN + tile.tx * TILE_SIZE, n0 = GRID_MIN + tile.ty * TILE_SIZE;
-  const buildings = buildBuildings(tile.buildings, tile.nTall, e0, n0);
+  const buildings = buildBuildings(tile.buildings, tile.nTall, e0, n0, { normRing, triangulate, Bounds, bay: BAY });
   const roads = buildRoads(tile.roads, e0, n0);
   const transfer = [];
   for (const part of [buildings, roads]) for (const k in part) if (ArrayBuffer.isView(part[k])) transfer.push(part[k].buffer);

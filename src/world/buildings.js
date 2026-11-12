@@ -28,7 +28,7 @@ export function createBuildings(env) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(d.position, 3));
       g.setAttribute('aNormal', new THREE.BufferAttribute(d.normal, 4, true));
-      g.setAttribute('aUv', new THREE.BufferAttribute(d.uv, 2));
+      g.setAttribute('aUv', new THREE.BufferAttribute(d.uv, 3));
       g.setAttribute('aColor', new THREE.BufferAttribute(d.color, 4, true));
       g.setIndex(new THREE.BufferAttribute(d.index, 1));
       g.boundingSphere = new THREE.Sphere(new THREE.Vector3(...d.center), d.radius);

@@ -250,18 +250,29 @@ Done when `npm run data:fetch && npm run data:build` produces `public/data/` ins
 - [x] 2.11 `scripts/stats.mjs`: sizes vs budget, height-source %, the 30 tallest buildings with source, count of estimated ≥ 150 m, land polygon count and area
 - [x] 2.12 `public/data/` built (no git repo exists yet, so nothing was committed), `BUILD_LOG.md` updated
 
-### Phase 3 — rendering and landmarks (Fable 5.2)
+### Phase 3 — rendering and landmarks (Fable 5.2) ✅
 Done when the city loads, the slider works from noon to night, the five landmarks stand in place and the tour plays.
-- [ ] 3.1 App shell: renderer, resize, render loop, quality state. Touches: `src/main.js`, `src/app.js`
-- [ ] 3.2 `timeOfDay.js` + sky dome + shared GLSL chunk. Touches: `src/env/timeOfDay.js`, `src/world/sky.js`, `src/shaders/common.glsl.js`
-- [ ] 3.3 Loader + tile worker (decode, earcut roofs, walls, ribbons). Touches: `src/data/loader.js`, `src/data/tileWorker.js`
-- [ ] 3.4 Land + sea plane + water shader v1. Touches: `src/world/land.js`, `src/world/water.js`
-- [ ] 3.5 Buildings: tile meshes, building shader with windows, LOD draw range. Touches: `src/world/buildings.js`, `src/shaders/building.glsl.js`
-- [ ] 3.6 Roads + street lights + car lights. Touches: `src/world/roads.js`, `src/world/traffic.js`
-- [ ] 3.7 Landmarks, one commit each, in this order: Burj Khalifa, Ain Dubai, Cayan, Burj Al Arab, Museum of the Future. Touches: `src/landmarks/*.js`
-- [ ] 3.8 Controls + tour + UI overlay with attribution. Touches: `src/camera/*.js`, `src/ui/ui.js`, `src/style.css`, `index.html`
-- [ ] 3.9 Bloom + tone mapping pass. Touches: `src/post.js`
-- [ ] 3.10 `npm run build` passes; update `BUILD_LOG.md`
+- [x] 3.1 App shell: renderer, resize, render loop, quality state. Touches: `src/main.js`, `src/app.js`
+- [x] 3.2 `timeOfDay.js` + sky dome + shared GLSL chunk. Touches: `src/env/timeOfDay.js`, `src/world/sky.js`, `src/shaders/common.glsl.js`
+- [x] 3.3 Loader + tile worker (decode, earcut roofs, walls, ribbons). Touches: `src/data/loader.js`, `src/data/tileWorker.js`
+- [x] 3.4 Land + sea plane + water shader v1. Touches: `src/world/land.js`, `src/world/water.js`
+- [x] 3.5 Buildings: tile meshes, building shader with windows, LOD draw range. Touches: `src/world/buildings.js`, `src/shaders/building.glsl.js`
+- [x] 3.6 Roads + street lights + car lights. Touches: `src/world/roads.js`, `src/world/traffic.js`
+- [x] 3.7 Landmarks, one commit each, in this order: Burj Khalifa, Ain Dubai, Cayan, Burj Al Arab, Museum of the Future. Touches: `src/landmarks/*.js`
+- [x] 3.8 Controls + tour + UI overlay with attribution. Touches: `src/camera/*.js`, `src/ui/ui.js`, `src/style.css`, `index.html`
+- [x] 3.9 Bloom + tone mapping pass. Touches: `src/post.js`
+- [x] 3.10 `npm run build` passes; update `BUILD_LOG.md`
+
+What Phase 3 built differently from §3 and §4 (read before Phase 4):
+- **Not looked at yet.** No screenshots were taken (rule above). Everything was checked by numbers: shader compile, mesh orientation and volume, pixel samples per time of day, UI events. Colours, bloom and landmark proportions still need a human look; that is the first job of Phase 4.
+- Extra files: `src/world/lightPoints.js` (street lights and beacons), `src/landmarks/common.js` (geometry builder + landmark material), `src/landmarks/index.js` (placement and chip views).
+- Draw order replaces small y gaps: sky, then sea (no depth write), then land, cover, roads (`renderOrder` + `polygonOffset`), then everything else. The quay wall ends at y = 0.
+- Burj Khalifa and Burj Al Arab are placed from the raw OSM outline, not from `landmarks.json` (its min-area rectangle does not give the wing or sail direction). Constants are in `src/landmarks/index.js`.
+- Bloom strength is 0.12 (golden hour) to 0.4 (night), threshold 1.0. UnrealBloomPass sums its mips with weights near 3, so the 0.7–0.85 first tried washed out the frame. With bloom off (noon, or Low) the scene renders straight to the canvas.
+- Tour runs 54 s, not ~40 s: at 40 s the Palm to Downtown legs pass 1 300 m/s. Its path was checked against every building >= 60 m (25 m margin).
+- Wall window `u` is in whole bays per wall, not metres, so windows never straddle a corner.
+- Varyings can be extrapolated far outside their range on edge-on triangles under MSAA. Never feed one to `exp()` or `pow()` unclamped (this flooded the bloom pass once).
+- `window.__dubai` exposes `stats()` (draw calls, triangles), `frame(now)` and `env.setTime(t)` for checks and for the Phase 4 `?perf` overlay.
 
 ### Phase 4 — polish and performance
 - [ ] 4.1 Measure: draw calls, triangles, frame time at 5 fixed camera spots (`?perf` overlay). Fix the worst first

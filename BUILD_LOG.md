@@ -32,14 +32,14 @@ The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them again
 
 | Phase | Model | Prompts | Time | Input | Output | Cache read | Cache write | API-equivalent |
 |---|---|---|---|---|---|---|---|---|
-| 1 Plan and skeleton | Fable 5.2 | 1 | ~16 min | 18 | 48,976 | 859,723 | 81,794 | ~$3.96 |
-| 2 Data pipeline | Sonnet 5.5 | 1 | | | | | | run `npm run usage` |
-| 3 Rendering and landmarks | Fable 5.2 | | | | | | | |
+| 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
+| 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | price not set (Phase 5) |
+| 3 Rendering and landmarks | Fable 5.2 | 1 | ~35 min+ | 74 | 202,278 | 8,445,618 | 282,216 | ~$19.36 |
 | 4 Polish and performance | | | | | | | | |
 | 5 README, deploy, launch | | | | | | | | |
 | **Total** | | | | | | | | |
 
-Phase 1 figures were measured just before the commit, so they miss the final turns. Re-run `npm run usage` for the exact number.
+Phases 1 and 2 are final figures, read on 2026-11-12 during Phase 3. Phase 3 was measured from inside its own session just before the commits, so it misses the last turns. Re-run `npm run usage` for the exact number.
 
 ### Phase 1 — plan and skeleton (2026-11-12)
 
@@ -72,3 +72,24 @@ Phase 1 figures were measured just before the commit, so they miss the final tur
 - Ways that are outer members of a building relation are now skipped (14 of them) so they are not drawn twice.
 - `data/build-report.json` is a by-product (tallest buildings with names) read by `data:stats`; it is small and kept with the sources.
 - Many buildings with Arabic-only `name` tags; override matching also tries `name:en`.
+
+### Phase 3 — rendering and landmarks (2026-11-12)
+
+**Done:** the city loads and renders, the slider runs noon to night, the five landmarks stand on their OSM footprints, the tour plays and any input skips it. `npm run build` passes (655 KB JS, 168 KB gzip; worker 19 KB). The phase was written and checked as a whole, then committed as one commit per task in plan order, so only the last commit of the phase runs on its own.
+
+**Result:** 86 building tiles (1.93 M vertices, 1.03 M triangles in total), 117 K road triangles, 8,698 street lights, 365 beacons, 1,500 cars, land 80 K triangles. Five landmarks in 8 draw calls and about 26 K triangles (Burj Khalifa 2.6 K, Ain Dubai 11.9 K with capsules, Cayan 2.1 K, Burj Al Arab 3.1 K, Museum 6.1 K). A frame is 54 to 137 draw calls and 350 K to 490 K triangles at the views tested (budget 250 and 1.2 M). The worker meshes all 98 tiles in about 1 s.
+
+**How it was checked (no screenshots, per the plan's rule):**
+- Node: every landmark mesh has finite values and outward faces; the building meshes enclose 680.1 Mm³ against 680.1 Mm³ computed from the footprints, which proves walls and roofs face outward; land and road triangles face up; the tour path clears every building of 60 m or more.
+- Browser: no console or shader errors; pixel blocks sampled at noon, golden hour, blue hour and night in both quality levels; each landmark's pixels compared with the landmark hidden; tour, slider, quality buttons, chips, WASD and the OSM credit driven by script.
+- Not checked: how it actually looks. Nobody has seen a frame yet. Frame time was only measured in a 786x799 pane on Intel Iris Xe, where it sat at the 16.6 ms vsync limit; the 1080p number is Phase 4.1.
+
+**What went wrong:**
+- Night was far too bright at first: about 70% of windows lit at 1.5 gave whole facades an average glow near white. Now a building lights 10 to 60% of its rooms, most of them dim and a few bright enough to bloom.
+- With bloom on, the lower half of the frame went white at dusk and night. The cause was one line: `exp(-height / 9)` for the street-light wash on walls. Under MSAA the height varying is extrapolated far below zero on walls seen edge-on, the exponential overflows, and the bloom pass spreads those pixels over the frame. Without bloom the same pixels just clip to white and nobody notices. Fixed by clamping the height. Found by rendering each layer alone into a float target and reading back the maximum.
+- While chasing that, bloom strength was cut from 0.85 to 0.4 at night. That part stays: UnrealBloomPass adds its five mips with weights that sum to about 3.
+- The Museum of the Future chip pointed the camera at the back of a neighbouring tower. A scan of 12 bearings picked the clear side.
+- The first tour path came within 25 m of a 303 m Marina tower and a 150 m Downtown tower. Raised three keyframes.
+- The OSM min-area rectangle is useless for Y-shaped and wedge-shaped footprints, so Burj Khalifa's wing angles (22.5°, 142.5°, 262.5°) and Burj Al Arab's mast corner and axis (37.6° south of east) were read from the raw outlines.
+
+**Open points for Phase 4:** look at it and tune colours; bloom and window levels at night; the tour is 54 s; bridges are flat; the Metro is a flat ribbon; the Museum's proportions are a compromise between the plan (roughly round) and the 140 m OSM footprint; `.claude/launch.json` (dev server for the preview pane) is untracked.

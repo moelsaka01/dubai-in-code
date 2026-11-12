@@ -22,6 +22,11 @@ uniform float uStars;
 uniform sampler2D uShadowMap; // r: height (m) below which a point is in the sun's shadow
 uniform sampler2D uCityMap;   // r: nearby building height / 510, g: land blur (shore), b: built density, a: wide density
 uniform float uShadowOn;
+uniform highp sampler2DShadow uSunMap; // crisp shadow map around the camera (src/world/sunShadow.js)
+uniform mat4 uSunMatrix;               // world -> shadow map uv and depth
+uniform float uSunTexel;               // metres per shadow map texel
+uniform float uSunOn;
+uniform sampler2D uCloudMap; // cloud cover of the layer overhead (src/world/clouds.js)
 `;
 
 export const COMMON = /* glsl */ `
@@ -71,10 +76,29 @@ vec3 skyColor(vec3 d) {
   return c;
 }
 
-// What a mirror sees: the sky above the horizon, sunlit ground and city below it.
+// High thin cloud: how much of it lies in direction d, and its colour. Shared by the dome and by reflections.
+float cloudCover(vec3 d) {
+  vec2 cp = d.xz / (max(d.y, 0.0) + 0.12) * 1.6;
+  return texture2D(uCloudMap, cp / 24.0 + 0.5).r * smoothstep(0.02, 0.25, d.y) * mix(0.55, 0.3, uNight);
+}
+
+vec3 cloudColor(vec3 d) {
+  return uAmbSky * 2.2 + uLightColor * 0.9 + uSkyHorizon * 0.25 + uSkyGlow * (0.5 * pow(max(dot(d, uSunDir), 0.0), 3.0));
+}
+
+// What a mirror sees: the sky above the horizon, sunlit ground and city below it. envColor() adds the clouds,
+// which costs two noise lookups, so it is kept for surfaces that are mostly mirror (glass towers, landmarks).
+vec3 envGround() {
+  return vec3(0.36, 0.33, 0.29) * (uLightColor * max(uLightDir.y, 0.0) + uAmbSky) + vec3(0.050, 0.034, 0.018) * uNight;
+}
+
+vec3 envPlain(vec3 d) {
+  return mix(envGround(), skyColor(d), smoothstep(-0.25, 0.06, d.y));
+}
+
 vec3 envColor(vec3 d) {
-  vec3 ground = vec3(0.36, 0.33, 0.29) * (uLightColor * max(uLightDir.y, 0.0) + uAmbSky) + vec3(0.050, 0.034, 0.018) * uNight;
-  return mix(ground, skyColor(d), smoothstep(-0.25, 0.06, d.y));
+  vec3 sky = mix(skyColor(d), cloudColor(d), cloudCover(d));
+  return mix(envGround(), sky, smoothstep(-0.25, 0.06, d.y));
 }
 
 vec3 hemi(vec3 n) {
@@ -94,6 +118,21 @@ float sunLit(vec3 p) {
   vec2 uv = cityUv(p);
   float s = texture2D(uShadowMap, uv).r;
   return mix(1.0, smoothstep(-0.5, 2.0, p.y - s), uShadowOn * cityInside(uv));
+}
+
+// Sunlight on a surface point with normal n: the crisp map near the camera, the height-map far field beyond it.
+float sunLight(vec3 p, vec3 n) {
+  float far = sunLit(p + (abs(n.y) > 0.5 ? vec3(0.0, 1.5, 0.0) : n * 9.0));
+  if (uSunOn < 0.5) return far;
+  // Step off the surface before looking it up, or it shadows itself.
+  vec3 c = (uSunMatrix * vec4(p + n * (uSunTexel * 1.6) + uLightDir * uSunTexel, 1.0)).xyz;
+  vec2 e = abs(c.xy - 0.5);
+  float inside = (1.0 - smoothstep(0.42, 0.49, max(e.x, e.y))) * step(c.z, 1.0);
+  if (inside <= 0.0) return far;
+  // Two taps on a diagonal; each is a hardware 2x2 comparison, so this is a 3x3 soft edge for two fetches.
+  float t = 0.5 / 2048.0;
+  float s = texture(uSunMap, vec3(c.xy + vec2(-t, -t), c.z)) + texture(uSunMap, vec3(c.xy + vec2(t, t), c.z));
+  return mix(far, mix(1.0, s * 0.5, uShadowOn), inside);
 }
 
 vec4 cityInfo(vec3 p) {

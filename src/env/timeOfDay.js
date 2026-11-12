@@ -67,6 +67,11 @@ export function createEnv() {
     uShadowMap: { value: flatTexture(-1000) },
     uCityMap: { value: flatTexture(0) },
     uShadowOn: { value: 0 },
+    uSunMap: { value: null }, // set by src/world/sunShadow.js before the first frame
+    uSunMatrix: { value: new THREE.Matrix4() },
+    uSunTexel: { value: 1 },
+    uSunOn: { value: 0 },
+    uCloudMap: { value: flatTexture(0) },
     uPixelScale: { value: 1000 }, // pixels per metre at 1 m distance; set by the app on resize
   };
   const cur = {};

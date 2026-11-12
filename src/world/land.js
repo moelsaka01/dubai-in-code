@@ -1,5 +1,7 @@
-// Land slab (sand top at 1.5 m with a quay wall down to the water) and the park / beach patches just above it.
+// Land slab (top at 1.5 m with a quay wall down to the water) and the park / beach patches just above it.
 // Geometry arrives from the tile worker in global scene coordinates.
+// The ground is not one colour: the city maps say how built-up each spot is, so open desert stays sand while
+// city blocks turn to paving, and towers darken the streets between them and throw shadows across them.
 import * as THREE from 'three';
 import { COMMON, OUTPUT } from '../shaders/common.glsl.js';
 
@@ -28,23 +30,32 @@ export function createLand(env) {
       varying float vKind;
 
       void main() {
-        vec3 sand = vec3(0.50, 0.42, 0.27);
-        vec3 green = vec3(0.13, 0.24, 0.07);
-        vec3 beach = vec3(0.64, 0.56, 0.39);
-        vec3 quay = vec3(0.30, 0.28, 0.24);
-        vec3 albedo = sand;
-        albedo = mix(albedo, green, step(0.5, vKind));
-        albedo = mix(albedo, beach, step(1.5, vKind));
+        vec4 info = cityInfo(vWorldPos);
+        float isGreen = step(0.5, vKind) * (1.0 - step(1.5, vKind));
+        float isBeach = step(1.5, vKind) * (1.0 - step(2.5, vKind));
         float wall = step(2.5, vKind);
-        albedo = mix(albedo, quay, wall);
 
-        float mottle = vnoise(vWorldPos.xz * 0.004) * 0.6 + vnoise(vWorldPos.xz * 0.035) * 0.4;
-        albedo *= 0.86 + 0.28 * mottle;
+        // Desert sand with drifts, fading to paving and compacted ground where buildings stand close.
+        float drift = vnoise(vWorldPos.xz * 0.0035) * 0.6 + vnoise(vWorldPos.xz * 0.03) * 0.4;
+        vec3 sand = mix(vec3(0.47, 0.39, 0.25), vec3(0.56, 0.48, 0.33), drift);
+        float paving = vnoise(vWorldPos.xz * 0.012 + 40.0);
+        vec3 paved = mix(vec3(0.34, 0.32, 0.29), vec3(0.44, 0.41, 0.36), paving);
+        float urban = smoothstep(0.02, 0.30, info.a * 0.6 + info.b * 0.6);
+        vec3 albedo = mix(sand, paved, urban * 0.85);
 
-        vec3 top = shadeLambert(albedo, vec3(0.0, 1.0, 0.0));
+        float tuft = vnoise(vWorldPos.xz * 0.09);
+        vec3 green = mix(vec3(0.10, 0.19, 0.06), vec3(0.17, 0.27, 0.09), tuft);
+        albedo = mix(albedo, green, isGreen);
+        albedo = mix(albedo, vec3(0.66, 0.59, 0.43) * (0.92 + 0.16 * drift), isBeach);
+        albedo = mix(albedo, vec3(0.30, 0.28, 0.25), wall);
+
+        float lit = sunLit(vWorldPos + vec3(0.0, 0.5, 0.0));
+        float ao = cityAO(vWorldPos, info);
+        vec3 top = shade(albedo, vec3(0.0, 1.0, 0.0), lit, ao);
         vec3 side = albedo * (hemi(vec3(1.0, 0.0, 0.0)) + uLightColor * 0.35);
         vec3 col = mix(top, side, wall);
-        col += albedo * vec3(1.0, 0.6, 0.3) * 0.02 * uNight; // spill from the city's lights
+        // Spill from the city's lights: strongest inside the built-up blocks.
+        col += albedo * vec3(1.0, 0.6, 0.3) * uNight * (0.012 + 0.10 * info.a) * (1.0 - wall);
 
         col = applyFog(col, vWorldPos);
         gl_FragColor = vec4(col, 1.0);

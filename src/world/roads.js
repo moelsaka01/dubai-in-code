@@ -42,9 +42,13 @@ export function createRoads(env) {
         float major = 1.0 - step(2.5, cls); // motorway, trunk, primary
         float marked = 1.0 - step(3.5, cls);
 
-        vec3 albedo = mix(vec3(0.050, 0.051, 0.055), vec3(0.085, 0.082, 0.076), step(3.5, cls));
+        // Sun-bleached asphalt is mid grey, not black; side streets are paler and dustier.
+        vec3 albedo = mix(vec3(0.095, 0.096, 0.100), vec3(0.150, 0.143, 0.130), step(3.5, cls));
         albedo = mix(albedo, vec3(0.34, 0.33, 0.31), rail);
-        albedo *= 0.9 + 0.2 * vnoise(vWorldPos.xz * 0.05);
+        albedo *= 0.86 + 0.28 * vnoise(vWorldPos.xz * 0.05);
+        // Tyre-polished lanes are a touch darker than the edges; a pale kerb line closes the road.
+        albedo *= 1.0 + 0.12 * smoothstep(0.55, 1.0, abs(vUv.x));
+        albedo = mix(albedo, vec3(0.42, 0.40, 0.36), smoothstep(0.93, 0.97, abs(vUv.x)) * (1.0 - rail));
 
         // Lane markings, only where a pixel is small enough to resolve them.
         float fwx = max(fwidth(x), 1e-4);
@@ -59,7 +63,8 @@ export function createRoads(env) {
         mark = max(mark, 1.0 - smoothstep(0.08, 0.08 + fwx, abs(abs(x) - inner)));
         albedo = mix(albedo, vec3(0.62), mark * detail * 0.85);
 
-        vec3 col = shadeLambert(albedo, vec3(0.0, 1.0, 0.0));
+        vec4 info = cityInfo(vWorldPos);
+        vec3 col = shade(albedo, vec3(0.0, 1.0, 0.0), sunLit(vWorldPos), cityAO(vWorldPos, info));
 
         // Night: pools of sodium light down the middle of the big roads, a faint wash on the rest.
         float across = exp(-vUv.x * vUv.x * 1.6);

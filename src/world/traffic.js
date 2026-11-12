@@ -77,7 +77,7 @@ export function createTraffic(env, traffic, count = 1500) {
       varying vec3 vWorldPos;
       void main() {
         float g = max(1.0 - length(vQuad), 0.0);
-        vec3 col = vColor * (g * g * (0.1 + 0.9 * uNight) * fogTransmittance(vWorldPos));
+        vec3 col = vColor * (g * g * (0.015 + 0.985 * uNight) * fogTransmittance(vWorldPos));
         gl_FragColor = vec4(col, 1.0);
         ${OUTPUT}
       }

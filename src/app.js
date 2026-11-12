@@ -7,6 +7,7 @@ import { createLand } from './world/land.js';
 import { createBuildings } from './world/buildings.js';
 import { createRoads } from './world/roads.js';
 import { createTraffic } from './world/traffic.js';
+import { createCityMap } from './world/cityMap.js';
 import { createLandmarks } from './landmarks/index.js';
 import { openCity } from './data/loader.js';
 import { createControls } from './camera/controls.js';
@@ -20,6 +21,12 @@ const QUALITY = {
   low: { dpr: 1, bloom: false, lodFar: 4500, minorFar: 3000 },
 };
 const FOV = 50;
+// Resolution scaling: when frames run long the render size shrinks (the canvas is stretched back up), and it
+// creeps up again once there is headroom. This is what keeps the tour smooth on an integrated GPU.
+// Every reduction is a trial: if the frame time does not improve, the cause is not the GPU's fill rate (a
+// throttled tab, a 30 fps cap, a busy CPU), so the reduction is undone and not tried again for a while.
+const MIN_SCALE = 0.5;
+const SLOW_MS = 20.5, FAST_MS = 17.6, WINDOW_MS = 750;
 
 export function createApp(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -37,12 +44,14 @@ export function createApp(canvas) {
   let traffic = null, landmarks = null;
 
   const post = createPost(renderer, scene, camera);
+  const cityMap = createCityMap(renderer, env);
 
   // ---- quality + resize ----
   let level = 'high';
+  const res = { enabled: true, scale: 1, sum: 0, n: 0, skip: 0, fast: 0, hold: 0, climbWait: 6000, lock: 0, lockWait: 30000, trial: null };
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, QUALITY[level].dpr);
+    const dpr = Math.min(window.devicePixelRatio || 1, QUALITY[level].dpr) * res.scale;
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
@@ -55,6 +64,41 @@ export function createApp(canvas) {
     level = next;
     ui.setQuality(level);
     resize();
+  }
+  /** Feed one frame time (ms) to the resolution governor. */
+  function govern(ms) {
+    if (!res.enabled || ms > 250) return; // a hitch (tab switch, tile upload) is not a slow frame
+    res.hold -= ms;
+    res.lock -= ms;
+    if (res.skip > 0) { res.skip -= ms; return; } // let a resize settle before judging it
+    res.sum += ms;
+    res.n++;
+    if (res.sum < WINDOW_MS) return;
+    const avg = res.sum / res.n;
+    res.sum = res.n = 0;
+    const set = (scale) => { res.scale = scale; res.skip = 300; resize(); };
+    if (res.trial) {
+      const helped = avg < res.trial.before * 0.88;
+      if (!helped) {
+        res.lock = res.lockWait;
+        res.lockWait = Math.min(600000, res.lockWait * 2);
+        set(res.trial.from);
+      }
+      res.trial = null;
+      return;
+    }
+    res.fast = avg < FAST_MS ? res.fast + WINDOW_MS : 0;
+    if (avg > SLOW_MS && res.scale > MIN_SCALE && res.lock <= 0) {
+      res.trial = { before: avg, from: res.scale };
+      res.fast = 0;
+      res.hold = res.climbWait;
+      res.climbWait = Math.min(120000, res.climbWait * 1.6); // each retreat waits longer before climbing again
+      set(Math.max(MIN_SCALE, res.scale * 0.82));
+    } else if (res.fast >= 4500 && res.hold <= 0 && res.scale < 1) {
+      res.fast = 0;
+      res.hold = 3000;
+      set(Math.min(1, res.scale * 1.12));
+    }
   }
 
   // ---- camera: tour and free controls ----
@@ -121,8 +165,10 @@ export function createApp(canvas) {
 
   // ---- loop ----
   let last = performance.now();
+  let loaded = false;
   function frame(now) {
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
+    if (loaded && now > last) govern(now - last);
     last = now;
     renderer.info.reset();
     env.tick(dt);
@@ -134,6 +180,7 @@ export function createApp(canvas) {
     roads.update(camera, q.minorFar);
     if (traffic) traffic.update(dt);
     if (landmarks) landmarks.update(dt);
+    cityMap.update();
     post.render(env, q.bloom);
   }
   renderer.setAnimationLoop(frame);
@@ -158,6 +205,11 @@ export function createApp(canvas) {
     ui.setStatus(result.failed
       ? `${result.failed} of ${result.total} data files failed to load. See the console.`
       : `${count} buildings from OpenStreetMap. Drag to orbit, scroll to zoom, WASD to fly.`);
+    // Height, shadow and occlusion maps: every tile at full detail, without the layers that are not ground or buildings.
+    buildings.update(camera, Infinity);
+    cityMap.render(scene, [sky.object, water.object, roads.object, traffic.object, buildings.beacons.object]);
+    loaded = true;
+    last = performance.now();
     if (autoTour) startTour();
     return result;
   })().catch((err) => {
@@ -167,7 +219,7 @@ export function createApp(canvas) {
   });
 
   return {
-    renderer, scene, camera, env, controls, tour, buildings, roads, ready, frame,
+    renderer, scene, camera, env, controls, tour, buildings, roads, ready, frame, cityMap, res, post,
     get landmarks() { return landmarks; },
     setQuality,
     get quality() { return level; },

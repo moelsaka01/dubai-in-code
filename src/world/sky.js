@@ -1,4 +1,5 @@
-// Sky dome: gradient, sun disc and halo, moon, stars. Follows the camera and never writes depth.
+// Sky dome: gradient, sun disc and halo, moon, stars. Follows the camera, sits on the far plane and is drawn
+// last, so only the pixels nothing else covered are shaded.
 import * as THREE from 'three';
 import { COMMON, OUTPUT } from '../shaders/common.glsl.js';
 
@@ -7,12 +8,12 @@ export function createSky(env) {
     uniforms: { ...env.uniforms },
     side: THREE.BackSide,
     depthWrite: false,
-    depthTest: false,
     vertexShader: /* glsl */ `
       varying vec3 vDir;
       void main() {
         vDir = position;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        gl_Position.z = gl_Position.w; // depth 1.0
       }
     `,
     fragmentShader: /* glsl */ `
@@ -49,6 +50,6 @@ export function createSky(env) {
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), material);
   mesh.scale.setScalar(30000);
   mesh.frustumCulled = false;
-  mesh.renderOrder = -100;
+  mesh.renderOrder = 100;
   return { object: mesh, update(camera) { mesh.position.copy(camera.position); } };
 }

@@ -116,6 +116,25 @@ function podium(b, outer, main) {
 }
 
 /**
+ * Tall towers narrow as they rise. Two thirds of the towers of 90 m or more are cut into three tiers, each
+ * a little slimmer than the one below. Lowers `shaft` to the first cut and returns the tiers above it.
+ */
+function taper(b, shaft) {
+  const h = b.height, y0 = shaft.y0;
+  if (h < 90 || b.isPart || b.kind > 2 || (b.seed * 5 + 1) % 3 === 0) return [];
+  const ring = shaft.rings[0];
+  const c = compact(ring);
+  if (!c.ok || c.area < 300) return [];
+  const cut1 = y0 + (h - y0) * (0.46 + (b.seed % 4) * 0.03), cut2 = y0 + (h - y0) * (0.68 + (b.seed % 3) * 0.02);
+  const k = 0.9 + (b.seed % 3) * 0.02;
+  shaft.y1 = cut1;
+  return [
+    { rings: [scaled(ring, c.cx, c.cy, k)], y0: cut1, y1: cut2 },
+    { rings: [scaled(ring, c.cx, c.cy, k * k)], y0: cut2, y1: h },
+  ];
+}
+
+/**
  * What stands on top of a tower: a stepped crown, a plant-room box or a mast, chosen by the seed.
  * Returns extra volumes and may lower the top of `shaft`.
  */
@@ -248,7 +267,10 @@ export function buildBuildings(list, nTall, e0, n0, h) {
     const simple = rings.length === 1;
     const shaft = simple ? podium(b, outer, main) : null;
     if (shaft) prisms.push(shaft);
-    const top = shaft || main;
+    let top = shaft || main;
+    const tiers = simple ? taper(b, top) : [];
+    prisms.push(...tiers);
+    if (tiers.length) top = tiers[tiers.length - 1];
     const extras = simple ? crown(b, top.rings[0], top) : [];
     prisms.push(...extras);
     if (simple && !shaft && !extras.length) main.rise = pitch(b, outer);

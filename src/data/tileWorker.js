@@ -117,20 +117,39 @@ function halfWidth(r) {
   return (Math.max(r.lanes, 2) * 3.3 + 1.2) / 2;
 }
 
+/** How high a bridge deck stands, from its OSM layer. */
+function deckHeight(r) {
+  return 6 + Math.max(0, r.layer - 1) * 5;
+}
+
 function buildRoads(list, e0, n0) {
   const use = list.filter((r) => !(r.flags & 2) && r.pts.length >= 4);
   const isMinor = (r) => r.cls === 4 || r.cls === 5;
   // Major classes first, so a far tile can draw only the first part of the index buffer.
   const order = use.filter((r) => !isMinor(r)).concat(use.filter(isMinor));
+
+  // Bridges rise off the ground (motorways and rail stay flat: their traffic and viaducts are drawn at grade).
+  // A deck ramps up from an end that meets the ground and stays level where it meets another bridge piece.
+  const raised = (r) => (r.flags & 1) !== 0 && r.cls !== 0 && r.cls !== 7;
+  const ends = new Map();
+  const key = (x, y) => `${Math.round(x)}_${Math.round(y)}`;
+  for (const r of order) {
+    if (!raised(r)) continue;
+    const p = r.pts, n = p.length;
+    for (const k of [key(p[0], p[1]), key(p[n - 2], p[n - 1])]) ends.set(k, (ends.get(k) || 0) + 1);
+  }
+
   let nVert = 0, nIdx = 0, nMajor = 0;
   for (const r of order) {
     const n = r.pts.length / 2;
-    nVert += n * 2;
-    nIdx += (n - 1) * 6;
-    if (!isMinor(r)) nMajor += (n - 1) * 6;
+    const strips = raised(r) ? 3 : 1; // deck plus a skirt down each side
+    nVert += n * 2 * strips;
+    nIdx += (n - 1) * 6 * strips;
+    if (!isMinor(r)) nMajor += (n - 1) * 6 * strips;
   }
   const pos = new Float32Array(nVert * 3);
   const uv = new Float32Array(nVert * 2);
+  const side = new Float32Array(nVert * 2); // metres of sideways movement per metre of extra half-width
   const info = new Uint8Array(nVert * 4);
   const idx = new Uint32Array(nIdx);
   const bounds = new Bounds();
@@ -141,10 +160,21 @@ function buildRoads(list, e0, n0) {
     const pts = r.pts, n = pts.length / 2;
     const hw = halfWidth(r);
     const hwByte = Math.min(255, Math.round(hw * 8));
-    const y = ROAD_Y + (r.cls === 7 ? 0.3 : (5 - Math.min(r.cls, 5)) * 0.02) + (r.flags & 1 ? 0.25 : 0) + Math.max(0, r.layer) * 0.12;
+    const base = ROAD_Y + (r.cls === 7 ? 0.3 : (5 - Math.min(r.cls, 5)) * 0.02) + Math.max(0, r.layer) * 0.12;
     const lit = r.cls <= 2;
+    const up = raised(r);
+    let total = 0;
+    if (up) for (let j = 0; j < n - 1; j++) total += Math.hypot(pts[2 * j + 2] - pts[2 * j], pts[2 * j + 3] - pts[2 * j + 1]);
+    const peak = up ? Math.min(deckHeight(r), total * 0.08) : 0;
+    const ramp = Math.min(70, total / 2);
+    const rampStart = up && ends.get(key(pts[0], pts[1])) < 2;
+    const rampEnd = up && ends.get(key(pts[2 * n - 2], pts[2 * n - 1])) < 2;
+    const ease = (t) => { const k = Math.min(1, Math.max(0, t)); return k * k * (3 - 2 * k); };
+    const lift = (s) => peak * (rampStart ? ease(s / ramp) : 1) * (rampEnd ? ease((total - s) / ramp) : 1);
+
     let along = 0, nextLight = LIGHT_SPACING / 2;
-    const base = v;
+    const first = v;
+    const edge = []; // per vertex pair: left and right positions, for the skirts
     for (let j = 0; j < n; j++) {
       const x = pts[2 * j], q = pts[2 * j + 1];
       // Segment directions before and after this vertex.
@@ -160,12 +190,15 @@ function buildRoads(list, e0, n0) {
       const lx = -tn, ln = tx;
       const cosHalf = Math.max(0.5, lx * -bn + ln * bx);
       const m = hw / cosHalf;
-      for (let side = -1; side <= 1; side += 2) {
-        const px = x + lx * m * -side, pn = q + ln * m * -side; // side -1 = left, +1 = right
+      const y = base + (up ? lift(along) : 0);
+      for (let s = -1; s <= 1; s += 2) {
+        const px = x + lx * m * -s, pn = q + ln * m * -s; // s -1 = left, +1 = right
         pos[v * 3] = px; pos[v * 3 + 1] = y; pos[v * 3 + 2] = -pn;
-        uv[v * 2] = side; uv[v * 2 + 1] = along;
+        uv[v * 2] = s; uv[v * 2 + 1] = along;
+        side[v * 2] = (lx * -s) / cosHalf; side[v * 2 + 1] = -(ln * -s) / cosHalf;
         info[v * 4] = r.cls; info[v * 4 + 1] = r.lanes; info[v * 4 + 2] = r.flags; info[v * 4 + 3] = hwByte;
         bounds.add(px, y, -pn);
+        edge.push(px, y, -pn);
         v++;
       }
       if (j < n - 1) {
@@ -173,18 +206,39 @@ function buildRoads(list, e0, n0) {
         if (lit) {
           while (nextLight <= along + segLen) {
             const f = (nextLight - along) / (segLen || 1);
-            lights.push(e0 + x + (pts[2 * j + 2] - x) * f, 11, -(n0 + q + (pts[2 * j + 3] - q) * f));
+            lights.push(e0 + x + (pts[2 * j + 2] - x) * f, 11 + (up ? lift(nextLight) : 0), -(n0 + q + (pts[2 * j + 3] - q) * f));
             nextLight += LIGHT_SPACING;
           }
         }
         along += segLen;
-        const l0 = base + 2 * j, r0 = l0 + 1, l1 = l0 + 2, r1 = l0 + 3;
+        const l0 = first + 2 * j, r0 = l0 + 1, l1 = l0 + 2, r1 = l0 + 3;
         idx[ii++] = r0; idx[ii++] = r1; idx[ii++] = l1;
         idx[ii++] = r0; idx[ii++] = l1; idx[ii++] = l0;
       }
     }
+    if (!up) continue;
+    // Skirts: the deck edge dropped 1.4 m, so a bridge has thickness. Marked with |uv.x| = 2 for the shader.
+    for (let s = 0; s < 2; s++) {
+      const start = v;
+      for (let j = 0; j < n; j++) {
+        const o = (j * 2 + s) * 3;
+        for (let k = 0; k < 2; k++) {
+          pos[v * 3] = edge[o]; pos[v * 3 + 1] = edge[o + 1] - k * 1.4; pos[v * 3 + 2] = edge[o + 2];
+          uv[v * 2] = s ? 2 : -2; uv[v * 2 + 1] = 0;
+          const src = first + j * 2 + s;
+          side[v * 2] = side[src * 2]; side[v * 2 + 1] = side[src * 2 + 1];
+          info[v * 4] = r.cls; info[v * 4 + 1] = r.lanes; info[v * 4 + 2] = r.flags; info[v * 4 + 3] = hwByte;
+          v++;
+        }
+      }
+      for (let j = 0; j < n - 1; j++) {
+        const a = start + j * 2;
+        idx[ii++] = a; idx[ii++] = a + 1; idx[ii++] = a + 3;
+        idx[ii++] = a; idx[ii++] = a + 3; idx[ii++] = a + 2;
+      }
+    }
   }
-  return { position: pos, uv, info, index: idx, majorIndexCount: nMajor, ...bounds.sphere(), lights: new Float32Array(lights) };
+  return { position: pos, uv, side, info, index: idx, majorIndexCount: nMajor, ...bounds.sphere(), lights: new Float32Array(lights) };
 }
 
 // ---------- street life ----------

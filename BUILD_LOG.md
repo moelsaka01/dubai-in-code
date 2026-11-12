@@ -34,7 +34,7 @@ The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them again
 |---|---|---|---|---|---|---|---|---|
 | 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
 | 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | price not set (Phase 5) |
-| 3 Rendering and landmarks, with review and detail passes | Fable 5.2 | 5 | ~372 min wall clock | 212 | 407,754 | 37,890,478 | 1,114,427 | ~$64.46 |
+| 3 Rendering and landmarks, with review, detail and lighting passes | Fable 5.2 | 5 | ~372 min wall clock | 212 | 407,754 | 37,890,478 | 1,114,427 | ~$64.46 |
 | 4 Polish and performance | | | | | | | | |
 | 5 README, deploy, launch | | | | | | | | |
 | **Total** | | | | | | | | |
@@ -136,3 +136,20 @@ The review pass fixed the frame rate, and the owner confirmed it. The second not
 - The session was cut off once mid-pass. The work was uncommitted but on disk, and resumed from `git status`.
 
 **Not done:** street cars stand still; car parks ignore street direction; trees and palms cast no shadows; no people.
+
+### Lighting pass (2026-11-13)
+
+Third verdict: still fake. This time the question went back to the owner in three parts. Answers: everything looks fake except the sea, roads included; equally in every view; and the goal is a film-like aerial shot of a clean architectural model. Two earlier passes had guessed "missing detail" and added objects. The answer pointed the other way: the sea, the one thing that worked, has no objects and no patterns, only smooth colour and soft light.
+
+**Changed:** a real shadow map around the camera for crisp shadows; contact shading (SSAO); a camera-style grade; glass that reflects as one smooth sheet with clouds in it; painted patterns removed from roofs and ground; roads drawn as pavement plus carriageway so junctions merge, with raised bridges; towers that step in as they rise.
+
+**Frame time** along the tour at 1920x1080 on Intel Iris Xe: 12.3 to 16.8 ms. The commit before measured 8.8 to 13.3 ms a few minutes earlier on the same warm laptop. The resolution governor covers the difference in the heaviest views (13 ms at 0.82 scale).
+
+**What went wrong:**
+- The first version cost 14 to 22 ms. Toggling parts on the live page gave contradictory answers because the laptop was heating up between readings. What settled it was stashing the work, timing the previous commit, and restoring: a true back-to-back comparison.
+- The causes, in order: cloud noise evaluated in every reflected pixel (moved to a texture), contact shading at half size (now quarter size), and the shadow pass at about 7 ms per refresh (now every fourth frame, towers only beyond 1.4 km, no trees).
+- A ternary in GLSL does not skip the unused side on this GPU: "glass ? clouds : plain" still paid for the clouds everywhere.
+- Contact shading turned to blotches on the far sea, where depth is coarse. Faded out past 5 km.
+- Stashing files under a running dev server produced one HTTP 500 for a missing module. Harmless, but it stays in the browser console and looked like a new error twice.
+
+**Not done:** trees and bridges cast no crisp shadows; street cars under raised decks; Low quality is unchanged.

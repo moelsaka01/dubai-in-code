@@ -1,4 +1,4 @@
-// Shared GLSL: environment uniforms, sky colour, lighting, height fog.
+// Shared GLSL: environment uniforms, sky colour, lighting, city shadow / occlusion maps, height fog.
 // Every material includes COMMON in its fragment shader, so the whole scene shifts together with time of day.
 
 /** Uniform declarations. The values live in one object (src/env/timeOfDay.js) shared by reference. */
@@ -19,12 +19,16 @@ uniform float uFogDensity;
 uniform float uNight;
 uniform float uLitFraction;
 uniform float uStars;
+uniform sampler2D uShadowMap; // r: height (m) below which a point is in the sun's shadow
+uniform sampler2D uCityMap;   // r: nearby building height / 510, g: land blur (shore), b: built density, a: wide density
+uniform float uShadowOn;
 `;
 
 export const COMMON = /* glsl */ `
 ${ENV_UNIFORMS}
 
 const float FOG_FALLOFF = 1.0 / 700.0; // haze thins with height; e-folding at 700 m
+const float CITY_SPAN = 24000.0;       // the maps cover the 24 km tile grid, north up
 
 float hash11(float p) {
   p = fract(p * 0.1031);
@@ -67,12 +71,48 @@ vec3 skyColor(vec3 d) {
   return c;
 }
 
+// What a mirror sees: the sky above the horizon, sunlit ground and city below it.
+vec3 envColor(vec3 d) {
+  vec3 ground = vec3(0.36, 0.33, 0.29) * (uLightColor * max(uLightDir.y, 0.0) + uAmbSky) + vec3(0.050, 0.034, 0.018) * uNight;
+  return mix(ground, skyColor(d), smoothstep(-0.25, 0.06, d.y));
+}
+
 vec3 hemi(vec3 n) {
   return mix(uAmbGround, uAmbSky, n.y * 0.5 + 0.5);
 }
 
+vec2 cityUv(vec3 p) {
+  return vec2(p.x, -p.z) / CITY_SPAN + 0.5;
+}
+
+float cityInside(vec2 uv) {
+  return step(max(abs(uv.x - 0.5), abs(uv.y - 0.5)), 0.499);
+}
+
+// 1 in sunlight, 0 in the shadow of a building. Sample walls a little outside their own footprint.
+float sunLit(vec3 p) {
+  vec2 uv = cityUv(p);
+  float s = texture2D(uShadowMap, uv).r;
+  return mix(1.0, smoothstep(-0.5, 2.0, p.y - s), uShadowOn * cityInside(uv));
+}
+
+vec4 cityInfo(vec3 p) {
+  vec2 uv = cityUv(p);
+  return texture2D(uCityMap, uv) * cityInside(uv);
+}
+
+// Ambient occlusion from the height of the buildings around a point: streets between towers go dark.
+float cityAO(vec3 p, vec4 info) {
+  float occl = clamp((info.r * 510.0 - p.y) / 110.0, 0.0, 1.0);
+  return 1.0 - 0.42 * occl;
+}
+
+vec3 shade(vec3 albedo, vec3 n, float lit, float ao) {
+  return albedo * (uLightColor * (max(dot(n, uLightDir), 0.0) * lit) + hemi(n) * ao);
+}
+
 vec3 shadeLambert(vec3 albedo, vec3 n) {
-  return albedo * (uLightColor * max(dot(n, uLightDir), 0.0) + hemi(n));
+  return shade(albedo, n, 1.0, 1.0);
 }
 
 // Exponential height fog, integrated along the view ray. Returns the fraction of light that survives.
@@ -99,7 +139,7 @@ vec3 applyFog(vec3 col, vec3 wp) {
 }
 `;
 
-/** Last lines of every fragment shader: tone mapping and colour space, both no-ops when rendering into the composer. */
+/** Last lines of every fragment shader: tone mapping and colour space, both no-ops when rendering into the post target. */
 export const OUTPUT = /* glsl */ `
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

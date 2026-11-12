@@ -19,9 +19,9 @@ const KEYS = [
   { t: 0.64, el: 0, az: 291, zenith: S(0x2a447e), horizon: S(0xee8a50), glow: S(0xff6a30, 1.0), sun: L(0.5, 0.21, 0.08),
     ambSky: L(0.075, 0.09, 0.15), ambGround: L(0.08, 0.055, 0.045), water: S(0x1a3a58), fog: 8.0e-5, exposure: 1.05, night: 0.45, lit: 0.45, bloom: 0.2, stars: 0 },
   { t: 0.75, el: -6, az: 296, zenith: S(0x0e1c44), horizon: S(0x5a4f78), glow: S(0xff5a30, 0.45), sun: L(0.3, 0.12, 0.05),
-    ambSky: L(0.04, 0.055, 0.11), ambGround: L(0.04, 0.032, 0.03), water: S(0x0a1a38), fog: 7.0e-5, exposure: 1.2, night: 0.8, lit: 0.6, bloom: 0.32, stars: 0.25 },
+    ambSky: L(0.04, 0.055, 0.11), ambGround: L(0.04, 0.032, 0.03), water: S(0x0a1a38), fog: 7.0e-5, exposure: 1.1, night: 0.8, lit: 0.6, bloom: 0.32, stars: 0.25 },
   { t: 1.0, el: -30, az: 310, zenith: S(0x060a16), horizon: S(0x3a2618), glow: S(0x000000), sun: L(0, 0, 0),
-    ambSky: L(0.022, 0.028, 0.045), ambGround: L(0.04, 0.03, 0.02), water: S(0x03080f), fog: 6.0e-5, exposure: 1.3, night: 1, lit: 0.7, bloom: 0.4, stars: 1 },
+    ambSky: L(0.022, 0.028, 0.045), ambGround: L(0.04, 0.03, 0.02), water: S(0x03080f), fog: 6.0e-5, exposure: 1.15, night: 1, lit: 0.7, bloom: 0.4, stars: 1 },
 ];
 const SCALARS = ['el', 'az', 'fog', 'exposure', 'night', 'lit', 'bloom', 'stars'];
 const COLORS = ['zenith', 'horizon', 'glow', 'sun', 'ambSky', 'ambGround', 'water'];
@@ -38,6 +38,13 @@ const smooth = (a, b, x) => {
   const k = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return k * k * (3 - 2 * k);
 };
+
+/** 1x1 float texture: what the shadow and city maps read as until src/world/cityMap.js has rendered them. */
+function flatTexture(v) {
+  const t = new THREE.DataTexture(new Float32Array([v, 0, 0, 0]), 1, 1, THREE.RGBAFormat, THREE.FloatType);
+  t.needsUpdate = true;
+  return t;
+}
 
 export function createEnv() {
   const uniforms = {
@@ -57,6 +64,9 @@ export function createEnv() {
     uNight: { value: 0 },
     uLitFraction: { value: 0 },
     uStars: { value: 0 },
+    uShadowMap: { value: flatTexture(-1000) },
+    uCityMap: { value: flatTexture(0) },
+    uShadowOn: { value: 0 },
     uPixelScale: { value: 1000 }, // pixels per metre at 1 m distance; set by the app on resize
   };
   const cur = {};
@@ -67,6 +77,8 @@ export function createEnv() {
     night: 0,
     exposure: 1,
     bloom: 0,
+    shadow: 0,
+    sunElevation: 0,
     uniforms,
     /** Advance the animation clock. */
     tick(dt) {
@@ -105,6 +117,9 @@ export function createEnv() {
       uniforms.uNight.value = cur.night;
       uniforms.uLitFraction.value = cur.lit;
       uniforms.uStars.value = cur.stars;
+      // Shadows fade out as the sun reaches the horizon; the moon casts none.
+      env.shadow = smooth(0.5, 5, cur.el);
+      env.sunElevation = cur.el;
       env.night = cur.night;
       env.exposure = cur.exposure;
       env.bloom = cur.bloom;

@@ -9,6 +9,8 @@ import { createRoads } from './world/roads.js';
 import { createTraffic } from './world/traffic.js';
 import { createProps } from './world/props.js';
 import { createCityMap } from './world/cityMap.js';
+import { createSunShadow } from './world/sunShadow.js';
+import { createClouds } from './world/clouds.js';
 import { createLandmarks } from './landmarks/index.js';
 import { openCity } from './data/loader.js';
 import { createControls } from './camera/controls.js';
@@ -48,6 +50,8 @@ export function createApp(canvas) {
 
   const post = createPost(renderer, scene, camera);
   const cityMap = createCityMap(renderer, env);
+  const sunShadow = createSunShadow(renderer, env);
+  const clouds = createClouds(renderer, env);
 
   // ---- quality + resize ----
   let level = 'high';
@@ -179,6 +183,9 @@ export function createApp(canvas) {
     else controls.update(dt);
     const q = QUALITY[level];
     sky.update(camera);
+    // Crisp shadows near the camera (High only). Its own pass over buildings, landmarks and trees.
+    if (loaded && q.bloom) sunShadow.update(scene, camera, [sky.object, water.object, land.object, roads.object, traffic.object, buildings.beacons.object, props.object], buildings);
+    else env.uniforms.uSunOn.value = 0;
     buildings.update(camera, q.lodFar, q.plantFar);
     props.object.visible = q.props;
     if (q.props) props.update(camera);
@@ -186,7 +193,8 @@ export function createApp(canvas) {
     if (traffic) traffic.update(dt);
     if (landmarks) landmarks.update(dt);
     cityMap.update();
-    post.render(env, q.bloom);
+    clouds.update();
+    post.render(env, q.bloom, dt);
   }
   renderer.setAnimationLoop(frame);
 
@@ -230,7 +238,7 @@ export function createApp(canvas) {
   });
 
   return {
-    renderer, scene, camera, env, controls, tour, buildings, roads, props, ready, frame, cityMap, res, post,
+    renderer, scene, camera, env, controls, tour, buildings, roads, props, ready, frame, cityMap, sunShadow, res, post,
     get landmarks() { return landmarks; },
     setQuality,
     get quality() { return level; },

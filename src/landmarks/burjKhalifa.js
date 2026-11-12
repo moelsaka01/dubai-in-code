@@ -83,9 +83,13 @@ export function create(env) {
 
         vec2 cell = floor(g);
         float share = uLitFraction * 0.35;
-        float lit = mix(share, step(hash21(cell + 3.0), share), detail);
+        float lit = mix(share * 0.35, step(hash21(cell + 3.0), share), detail);
         float sparkle = mix(0.008, step(0.992, hash21(cell * 0.73 + floor(uTime * 4.0) * 7.0)), detail);
-        vec3 e = vec3(0.80, 0.90, 1.0) * (0.06 + 0.9 * lit * (1.0 - frame)) + vec3(2.5) * sparkle;
+        // After dark the tower is not floodlit evenly: it is dim at the foot, brighter toward the top, banded by
+        // its mechanical floors, with scattered lit rooms and the LED sparkle running over it.
+        float rise = 0.35 + 0.65 * smoothstep(0.0, 620.0, y);
+        float bandGlow = 0.7 + 0.5 * step(0.86, fract(y / 104.0));
+        vec3 e = vec3(0.80, 0.90, 1.0) * (0.035 * rise * bandGlow + 0.9 * lit * (1.0 - frame)) + vec3(2.5) * sparkle;
         emissive = mix(e, vec3(0.9, 0.95, 1.0) * 0.6, spire) * uNight;
       }
     `,

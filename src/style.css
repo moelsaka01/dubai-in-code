@@ -188,8 +188,13 @@ button[aria-pressed='true'] {
 }
 
 @media (max-width: 720px) {
+  #title {
+    right: 12px;
+  }
+
+  /* Below the title block: the status line wraps to two lines at this width. */
   #chips {
-    top: 64px;
+    top: 116px;
     left: 12px;
     right: 12px;
     justify-content: flex-start;

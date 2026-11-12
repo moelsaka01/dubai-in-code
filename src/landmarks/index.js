@@ -23,7 +23,7 @@ const PLACEMENT = {
 const VIEWS = {
   burjKhalifa: { bearing: -70, dist: 1500, height: 380, lookAt: 380 },
   ainDubai: { bearing: 192, dist: 620, height: 110, lookAt: 125 },
-  cayan: { bearing: 150, dist: 760, height: 230, lookAt: 165 },
+  cayan: { bearing: -170, dist: 640, height: 230, lookAt: 165 }, // from the sea side; most other bearings are blocked by Marina towers
   burjAlArab: { bearing: 70, dist: 720, height: 150, lookAt: 150 },
   museumFuture: { bearing: 141, dist: 260, height: 55, lookAt: 42 }, // face-on from the north-west; a tower blocks the other side
 };

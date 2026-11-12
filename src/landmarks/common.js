@@ -227,7 +227,8 @@ export function strut(from, to, r0, r1, sides = 8) {
 }
 
 /**
- * Landmark surface material. `body` is GLSL that may set: albedo, emissive, gloss (0..1 sky reflection).
+ * Landmark surface material. `body` is GLSL that may set: albedo, emissive, gloss (0..1 mirror reflection),
+ * metal (0..1: reflects at every angle, not only at grazing ones).
  * It can read n (world normal), V (to camera), vLocal (object-space position), vUv, vWorldPos.
  */
 export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = THREE.FrontSide }) {
@@ -266,13 +267,18 @@ export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = T
         vec3 albedo = vec3(0.7);
         vec3 emissive = vec3(0.0);
         float gloss = 0.0;
+        float metal = 0.0;
         ${body}
-        vec3 col = shadeLambert(albedo, n);
+        // Sun shadow and occlusion from the city maps, sampled a little outside the surface.
+        vec3 outside = vWorldPos + n * 9.0;
+        float lit = sunLit(outside);
+        float ao = cityAO(vWorldPos, cityInfo(outside));
+        vec3 col = shade(albedo, n, lit, ao);
         vec3 R = reflect(-V, n);
         float fres = pow(1.0 - max(dot(n, V), 0.0), 5.0);
-        vec3 sky = skyColor(normalize(vec3(R.x, abs(R.y) + 0.03, R.z)));
-        col = mix(col, sky, gloss * (0.25 + 0.75 * fres));
-        col += uLightColor * pow(max(dot(R, uLightDir), 0.0), 80.0) * gloss * 0.8;
+        vec3 mirror = envColor(R) * mix(0.7, 1.0, ao);
+        col = mix(col, mirror, gloss * mix(0.25 + 0.75 * fres, 0.75 + 0.25 * fres, metal));
+        col += uLightColor * (pow(max(dot(R, uLightDir), 0.0), 80.0) * gloss * 0.8 * lit);
         col = applyFog(col + emissive, vWorldPos);
         gl_FragColor = vec4(col, 1.0);
         ${OUTPUT}
@@ -298,7 +304,7 @@ export function lineMaterial(env, rgb) {
       uniform vec3 uColor;
       varying vec3 vWorldPos;
       void main() {
-        vec3 col = uColor * (hemi(vec3(0.0, 1.0, 0.0)) + uLightColor * 0.6 + vec3(0.25, 0.28, 0.35) * uNight);
+        vec3 col = uColor * (hemi(vec3(0.0, 1.0, 0.0)) + uLightColor * 0.6 + vec3(0.03, 0.035, 0.045) * uNight);
         gl_FragColor = vec4(applyFog(col, vWorldPos), 1.0);
         ${OUTPUT}
       }

@@ -239,6 +239,7 @@ export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = T
       varying vec3 vWorldPos;
       varying vec3 vNormal;
       varying vec3 vLocal;
+      varying vec3 vOrigin; // world position of this object's (or instance's) origin
       varying vec2 vUv;
       void main() {
         mat4 m = modelMatrix;
@@ -249,6 +250,7 @@ export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = T
         vWorldPos = wp.xyz;
         vNormal = mat3(m) * normal;
         vLocal = position;
+        vOrigin = m[3].xyz;
         vUv = uv;
         gl_Position = projectionMatrix * viewMatrix * wp;
       }
@@ -258,11 +260,15 @@ export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = T
       varying vec3 vWorldPos;
       varying vec3 vNormal;
       varying vec3 vLocal;
+      varying vec3 vOrigin;
       varying vec2 vUv;
       ${decl}
 
       void main() {
         vec3 n = normalize(vNormal);
+        #ifdef DOUBLE_SIDED
+          if (!gl_FrontFacing) n = -n;
+        #endif
         vec3 V = normalize(cameraPosition - vWorldPos);
         vec3 albedo = vec3(0.7);
         vec3 emissive = vec3(0.0);

@@ -4,7 +4,7 @@
 import earcut from 'earcut';
 import { decodeTile, decodeLand } from '../shared/format.js';
 import { TILE_SIZE, GRID_MIN } from '../shared/config.js';
-import { buildBuildings } from './buildingMesh.js';
+import { buildBuildings, centroid, inside, rng } from './buildingMesh.js';
 
 const LAND_Y = 1.5; // top of the land slab
 const COVER_Y = 1.55; // parks and beaches
@@ -187,13 +187,69 @@ function buildRoads(list, e0, n0) {
   return { position: pos, uv, info, index: idx, majorIndexCount: nMajor, ...bounds.sphere(), lights: new Float32Array(lights) };
 }
 
+// ---------- street life ----------
+
+const MAX_PALMS = 1500, MAX_CARS = 700;
+
+/**
+ * Where the things that are not on the map go. Palms line the main roads and stand in villa gardens; cars sit
+ * on the streets (the motorways get moving ones from traffic.json). Each item is (x, z, size, heading) in scene metres.
+ */
+function buildProps(tile, e0, n0) {
+  const palms = [], trees = [], cars = [];
+  const rnd = rng(tile.tx * 7919 + tile.ty * 104729 + 17);
+  for (const r of tile.roads) {
+    if (r.flags & 3 || r.cls === 0 || r.cls >= 6) continue; // not on bridges, in tunnels, on motorways, ramps or rail
+    const pts = r.pts, n = pts.length / 2;
+    const hw = halfWidth(r);
+    const lined = r.cls <= 4; // trunk to tertiary roads are planted
+    const spacing = r.cls <= 3 ? 34 : 48;
+    let nextPalm = 6 + rnd() * spacing, nextCar = 10 + rnd() * 60, along = 0, side = rnd() < 0.5 ? 1 : -1;
+    for (let j = 0; j < n - 1; j++) {
+      const ax = pts[2 * j], an = pts[2 * j + 1], bx = pts[2 * j + 2], bn = pts[2 * j + 3];
+      const len = Math.hypot(bx - ax, bn - an);
+      if (len < 0.5) continue;
+      const dx = (bx - ax) / len, dn = (bn - an) / len;
+      while (lined && nextPalm <= along + len && palms.length < MAX_PALMS * 4) {
+        const f = nextPalm - along, off = (hw + 2.6) * side;
+        // right of travel is (dn, -dx) in plan
+        palms.push(e0 + ax + dx * f + dn * off, -(n0 + an + dn * f - dx * off), 0.8 + rnd() * 0.5, rnd() * 6.283);
+        side = -side;
+        nextPalm += spacing * (0.5 + rnd() * 0.25);
+      }
+      while (nextCar <= along + len && cars.length < MAX_CARS * 4) {
+        const f = nextCar - along;
+        const right = rnd() < 0.5 ? 1 : -1; // which side of the centre line; drive on the right
+        const off = Math.min(hw - 1.3, 1.7 + Math.floor(rnd() * Math.max(1, r.lanes / 2)) * 3.3) * right;
+        const heading = Math.atan2(dn * right, dx * right); // plan angle of travel
+        cars.push(e0 + ax + dx * f + dn * off, -(n0 + an + dn * f - dx * off), 0.9 + rnd() * 0.25, heading);
+        nextCar += (r.cls === 5 ? 110 : 40) * (0.4 + rnd() * 1.6);
+      }
+      along += len;
+    }
+  }
+  // A palm or a shade tree in most villa gardens.
+  for (const b of tile.buildings) {
+    if (b.kind !== 3 || rnd() > 0.7) continue;
+    const ring = b.rings[0];
+    const [cx, cy, area] = centroid(ring);
+    if (!Number.isFinite(cx)) continue;
+    const reach = Math.sqrt(Math.abs(area)) * 0.75 + 2.5, a = rnd() * 6.283;
+    const x = cx + Math.cos(a) * reach, y = cy + Math.sin(a) * reach;
+    if (inside(ring, x, y)) continue;
+    (rnd() < 0.6 ? palms : trees).push(e0 + x, -(n0 + y), 0.7 + rnd() * 0.5, rnd() * 6.283);
+  }
+  return { palms: new Float32Array(palms), trees: new Float32Array(trees), cars: new Float32Array(cars) };
+}
+
 function buildTile(tile) {
   const e0 = GRID_MIN + tile.tx * TILE_SIZE, n0 = GRID_MIN + tile.ty * TILE_SIZE;
   const buildings = buildBuildings(tile.buildings, tile.nTall, e0, n0, { normRing, triangulate, Bounds, bay: BAY });
   const roads = buildRoads(tile.roads, e0, n0);
+  const props = buildProps(tile, e0, n0);
   const transfer = [];
-  for (const part of [buildings, roads]) for (const k in part) if (ArrayBuffer.isView(part[k])) transfer.push(part[k].buffer);
-  return { data: { tx: tile.tx, ty: tile.ty, origin: [e0, 0, -n0], buildings, roads }, transfer };
+  for (const part of [buildings, roads, props]) for (const k in part) if (ArrayBuffer.isView(part[k])) transfer.push(part[k].buffer);
+  return { data: { tx: tile.tx, ty: tile.ty, origin: [e0, 0, -n0], buildings, roads, props }, transfer };
 }
 
 // ---------- land ----------
@@ -201,6 +257,28 @@ function buildTile(tile) {
 /** kind attribute: 0 land top, 1 green, 2 beach, 3 quay wall. Coordinates are global scene metres. */
 function buildLand(polys) {
   const out = {};
+  // Trees in parks and on golf courses: scattered inside every green polygon.
+  const palms = [], trees = [];
+  const rnd = rng(4242);
+  for (const p of polys) {
+    if (p.kind !== 1) continue;
+    const ring = p.rings[0];
+    const [, , a] = centroid(ring);
+    const want = Math.min(160, Math.floor(Math.abs(a) / 420));
+    if (want < 1) continue;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < ring.length; i += 2) {
+      x0 = Math.min(x0, ring[i]); x1 = Math.max(x1, ring[i]);
+      y0 = Math.min(y0, ring[i + 1]); y1 = Math.max(y1, ring[i + 1]);
+    }
+    for (let made = 0, tries = 0; made < want && tries < want * 5; tries++) {
+      const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
+      if (!inside(ring, x, y)) continue;
+      (rnd() < 0.4 ? palms : trees).push(x, -y, 0.75 + rnd() * 0.6, rnd() * 6.283);
+      made++;
+    }
+  }
+  out.props = { palms: new Float32Array(palms), trees: new Float32Array(trees), cars: new Float32Array(0) };
   for (const layer of ['land', 'cover']) {
     const isLand = layer === 'land';
     const prep = [];
@@ -250,5 +328,5 @@ function buildLand(polys) {
     }
     out[layer] = { position: pos, kind, index: idx };
   }
-  return { data: out, transfer: [out.land.position.buffer, out.land.kind.buffer, out.land.index.buffer, out.cover.position.buffer, out.cover.kind.buffer, out.cover.index.buffer] };
+  return { data: out, transfer: [out.land.position.buffer, out.land.kind.buffer, out.land.index.buffer, out.cover.position.buffer, out.cover.kind.buffer, out.cover.index.buffer, out.props.palms.buffer, out.props.trees.buffer] };
 }

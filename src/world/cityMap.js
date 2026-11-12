@@ -149,6 +149,22 @@ export function createCityMap(renderer, env) {
     renderer.render(fsScene, fsCamera);
   }
 
+  // Small readable copy for the CPU (boat placement): r = land, g = blurred land.
+  const MASK = 512;
+  const maskRT = target(MASK, { type: THREE.UnsignedByteType });
+  const maskMaterial = new THREE.ShaderMaterial({
+    uniforms: { tH: { value: heightRT.texture }, tC: { value: cityRT.texture } },
+    vertexShader: FS_VERTEX,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tH;
+      uniform sampler2D tC;
+      varying vec2 vUv;
+      void main() {
+        gl_FragColor = vec4(texture2D(tH, vUv).g, texture2D(tC, vUv).g, 0.0, 1.0);
+      }
+    `,
+  });
+
   let ready = false, job = null;
   const lastDir = new THREE.Vector3(0, -1, 0);
 
@@ -202,6 +218,15 @@ export function createCityMap(renderer, env) {
       renderer.setRenderTarget(prevTarget);
       ready = true;
       job = null;
+    },
+    /** Land mask read back to the CPU: { data: RGBA bytes, size }, row 0 at the south edge. */
+    waterMask() {
+      const prevTarget = renderer.getRenderTarget();
+      pass(maskMaterial, maskRT);
+      const data = new Uint8Array(MASK * MASK * 4);
+      renderer.readRenderTargetPixels(maskRT, 0, 0, MASK, MASK, data);
+      renderer.setRenderTarget(prevTarget);
+      return { data, size: MASK };
     },
     /** Per frame: keep the shadow map in step with the sun, a strip at a time. */
     update() {

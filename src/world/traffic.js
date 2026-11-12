@@ -2,8 +2,10 @@
 // traffic.json. A car shows white when it drives toward the camera and red when it drives away.
 import * as THREE from 'three';
 import { COMMON, OUTPUT } from '../shaders/common.glsl.js';
+import { carGeometry, carMaterial } from './props.js';
 
-const CAR_Y = 2.6;
+const CAR_Y = 2.6; // height of the light glow
+const BODY_Y = 1.72; // wheels on the motorway surface
 
 export function createTraffic(env, traffic, count = 1500) {
   // Arc-length tables.
@@ -84,11 +86,18 @@ export function createTraffic(env, traffic, count = 1500) {
     `,
   });
 
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.frustumCulled = false;
+  const lightsMesh = new THREE.Mesh(geometry, material);
+  lightsMesh.frustumCulled = false;
+  // The same cars as bodies, so the motorways are not empty by day.
+  const bodies = new THREE.InstancedMesh(carGeometry(), carMaterial(env), Math.max(n, 1));
+  bodies.count = n;
+  bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  bodies.frustumCulled = false;
+  const mesh = new THREE.Group();
+  mesh.add(lightsMesh, bodies);
 
   function place() {
-    const P = iPos.array, D = iDir.array;
+    const P = iPos.array, D = iDir.array, M = bodies.instanceMatrix.array;
     for (let i = 0; i < n; i++) {
       const c = cars[i], l = lines[c.line];
       const cum = l.cum, pts = l.pts;
@@ -105,7 +114,14 @@ export function createTraffic(env, traffic, count = 1500) {
       const north = an + (bn - an) * f - de * c.lateral;
       P[3 * i] = e; P[3 * i + 1] = CAR_Y; P[3 * i + 2] = -north;
       D[2 * i] = de; D[2 * i + 1] = -dn;
+      // Rotation about y that turns the car's +x axis to its heading, then the position (column-major).
+      const o = 16 * i;
+      M[o] = de; M[o + 1] = 0; M[o + 2] = -dn; M[o + 3] = 0;
+      M[o + 4] = 0; M[o + 5] = 1; M[o + 6] = 0; M[o + 7] = 0;
+      M[o + 8] = dn; M[o + 9] = 0; M[o + 10] = de; M[o + 11] = 0;
+      M[o + 12] = e; M[o + 13] = BODY_Y; M[o + 14] = -north; M[o + 15] = 1;
     }
+    bodies.instanceMatrix.needsUpdate = true;
     iPos.needsUpdate = true;
     iDir.needsUpdate = true;
   }

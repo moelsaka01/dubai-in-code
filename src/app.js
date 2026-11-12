@@ -7,6 +7,7 @@ import { createLand } from './world/land.js';
 import { createBuildings } from './world/buildings.js';
 import { createRoads } from './world/roads.js';
 import { createTraffic } from './world/traffic.js';
+import { createProps } from './world/props.js';
 import { createCityMap } from './world/cityMap.js';
 import { createLandmarks } from './landmarks/index.js';
 import { openCity } from './data/loader.js';
@@ -16,9 +17,10 @@ import { createUI } from './ui/ui.js';
 import { createPost } from './post.js';
 
 // lodFar: beyond it a tile draws only its >= 40 m buildings. minorFar: beyond it class >= 4 roads are hidden.
+// plantFar: within it a tile also draws its roof plant. props: trees, cars and boats.
 const QUALITY = {
-  high: { dpr: 1.5, bloom: true, lodFar: 7000, minorFar: 5000 },
-  low: { dpr: 1, bloom: false, lodFar: 4500, minorFar: 3000 },
+  high: { dpr: 1.5, bloom: true, lodFar: 7000, minorFar: 5000, plantFar: 2200, props: true },
+  low: { dpr: 1, bloom: false, lodFar: 4500, minorFar: 3000, plantFar: 0, props: false },
 };
 const FOV = 50;
 // Resolution scaling: when frames run long the render size shrinks (the canvas is stretched back up), and it
@@ -40,7 +42,8 @@ export function createApp(canvas) {
   const land = createLand(env);
   const buildings = createBuildings(env);
   const roads = createRoads(env);
-  scene.add(sky.object, water.object, land.object, roads.object, buildings.object);
+  const props = createProps(env);
+  scene.add(sky.object, water.object, land.object, roads.object, buildings.object, props.object);
   let traffic = null, landmarks = null;
 
   const post = createPost(renderer, scene, camera);
@@ -176,7 +179,9 @@ export function createApp(canvas) {
     else controls.update(dt);
     const q = QUALITY[level];
     sky.update(camera);
-    buildings.update(camera, q.lodFar);
+    buildings.update(camera, q.lodFar, q.plantFar);
+    props.object.visible = q.props;
+    if (q.props) props.update(camera);
     roads.update(camera, q.minorFar);
     if (traffic) traffic.update(dt);
     if (landmarks) landmarks.update(dt);
@@ -194,10 +199,14 @@ export function createApp(canvas) {
     const focus = [tour.first.position.x, -tour.first.position.z];
     const result = await city.stream({
       focus,
-      onLand: (m) => land.setData(m),
+      onLand: (m) => {
+        land.setData(m);
+        props.add(m.props);
+      },
       onTile: (m) => {
         buildings.addTile(m.origin, m.buildings);
         roads.addTile(m.origin, m.roads);
+        props.add(m.props);
       },
       onProgress: (f) => ui.setProgress(f),
     });
@@ -207,7 +216,9 @@ export function createApp(canvas) {
       : `${count} buildings from OpenStreetMap. Drag to orbit, scroll to zoom, WASD to fly.`);
     // Height, shadow and occlusion maps: every tile at full detail, without the layers that are not ground or buildings.
     buildings.update(camera, Infinity);
-    cityMap.render(scene, [sky.object, water.object, roads.object, traffic.object, buildings.beacons.object]);
+    cityMap.render(scene, [sky.object, water.object, roads.object, traffic.object, buildings.beacons.object, props.object]);
+    props.addBoats(cityMap.waterMask());
+    props.build();
     loaded = true;
     last = performance.now();
     if (autoTour) startTour();
@@ -219,7 +230,7 @@ export function createApp(canvas) {
   });
 
   return {
-    renderer, scene, camera, env, controls, tour, buildings, roads, ready, frame, cityMap, res, post,
+    renderer, scene, camera, env, controls, tour, buildings, roads, props, ready, frame, cityMap, res, post,
     get landmarks() { return landmarks; },
     setQuality,
     get quality() { return level; },

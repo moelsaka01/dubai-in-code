@@ -1,0 +1,597 @@
+{
+ "builtAt": "2026-11-12T09:43:40.338Z",
+ "flags": [],
+ "tall": [
+  {
+   "id": "w907717855",
+   "name": "23 Marina",
+   "height": 395,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1294,
+   "isPart": true
+  },
+  {
+   "id": "w288039567",
+   "name": "Princess Tower",
+   "height": 387,
+   "src": "tag",
+   "zone": "marina",
+   "area": 835,
+   "isPart": true
+  },
+  {
+   "id": "w1557287028",
+   "name": "Ciel Tower",
+   "height": 377,
+   "src": "tag",
+   "zone": "marina",
+   "area": 768,
+   "isPart": true
+  },
+  {
+   "id": "w295954577",
+   "name": "Princess Tower",
+   "height": 370,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1030,
+   "isPart": true
+  },
+  {
+   "id": "w257414083",
+   "name": "City Tower 1",
+   "height": 363,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1977,
+   "isPart": false
+  },
+  {
+   "id": "w186351080",
+   "name": "Elite Residence",
+   "height": 360,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1768,
+   "isPart": false
+  },
+  {
+   "id": "w1491743595",
+   "name": "برج الماس",
+   "height": 360,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1615,
+   "isPart": true
+  },
+  {
+   "id": "w125848289",
+   "name": "فندق جيفورا",
+   "height": 356,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1045,
+   "isPart": false
+  },
+  {
+   "id": "w393391115",
+   "name": "Jumeirah Emirates Office Tower",
+   "height": 355,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1258,
+   "isPart": false
+  },
+  {
+   "id": "w1528954691",
+   "name": "Al Habtoor Tower",
+   "height": 345,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 2409,
+   "isPart": true
+  },
+  {
+   "id": "w1527545124",
+   "name": "Mercedes Benz Places by Binghatti",
+   "height": 341,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 722,
+   "isPart": true
+  },
+  {
+   "id": "w1026297242",
+   "name": "أبتون دبي برج 1",
+   "height": 340,
+   "src": "tag",
+   "zone": "marina",
+   "area": 2648,
+   "isPart": false
+  },
+  {
+   "id": "w574137549",
+   "name": "DAMAC Heights",
+   "height": 335,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1775,
+   "isPart": false
+  },
+  {
+   "id": "w1126438864",
+   "name": "The A-Tower",
+   "height": 334,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1112,
+   "isPart": false
+  },
+  {
+   "id": "w238284907",
+   "name": "JW Marriott Marquis Hotel Tower 1",
+   "height": 330,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 909,
+   "isPart": false
+  },
+  {
+   "id": "w238284909",
+   "name": "JW Marriott Marquis Hotel Tower 2",
+   "height": 330,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1342,
+   "isPart": false
+  },
+  {
+   "id": "w238284900",
+   "name": "Al Yaqoub Tower",
+   "height": 328,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1182,
+   "isPart": false
+  },
+  {
+   "id": "w935572020",
+   "name": "Index Tower",
+   "height": 326,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 142,
+   "isPart": true
+  },
+  {
+   "id": "w935572021",
+   "name": "Index Tower",
+   "height": 326,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 143,
+   "isPart": true
+  },
+  {
+   "id": "w935572023",
+   "name": "Index Tower",
+   "height": 326,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 142,
+   "isPart": true
+  },
+  {
+   "id": "w935572024",
+   "name": "Index Tower",
+   "height": 326,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 142,
+   "isPart": true
+  },
+  {
+   "id": "w935572026",
+   "name": "Index Tower",
+   "height": 326,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 142,
+   "isPart": true
+  },
+  {
+   "id": "w935572027",
+   "name": "Index Tower",
+   "height": 326,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 142,
+   "isPart": true
+  },
+  {
+   "id": "w118263836",
+   "name": "Mr. C Residences Downtown",
+   "height": 323,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1644,
+   "isPart": false
+  },
+  {
+   "id": "w935572018",
+   "name": "Index Tower",
+   "height": 322,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1758,
+   "isPart": true
+  },
+  {
+   "id": "w238284904",
+   "name": "Blue Tower (HHHR Tower)",
+   "height": 317,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1845,
+   "isPart": false
+  },
+  {
+   "id": "w64890199",
+   "name": "Rose Rayhaan by Rotana",
+   "height": 315,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 634,
+   "isPart": false
+  },
+  {
+   "id": "w195527254",
+   "name": "Ocean Heights",
+   "height": 310,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1510,
+   "isPart": false
+  },
+  {
+   "id": "w916056282",
+   "name": "One Za'abeel Tower 2",
+   "height": 305,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 2014,
+   "isPart": false
+  },
+  {
+   "id": "w1013326039",
+   "name": "Address Jumeirah Resort",
+   "height": 303,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1169,
+   "isPart": true
+  },
+  {
+   "id": "w1013326040",
+   "name": "Address Jumeirah Resort",
+   "height": 303,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1066,
+   "isPart": true
+  },
+  {
+   "id": "w1013326041",
+   "name": "Address Jumeirah Resort",
+   "height": 303,
+   "src": "tag",
+   "zone": "marina",
+   "area": 808,
+   "isPart": true
+  },
+  {
+   "id": "w935572014",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 27,
+   "isPart": true
+  },
+  {
+   "id": "w935572015",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 195,
+   "isPart": true
+  },
+  {
+   "id": "w935572017",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 25,
+   "isPart": true
+  },
+  {
+   "id": "w935572019",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 100,
+   "isPart": true
+  },
+  {
+   "id": "w935572022",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 92,
+   "isPart": true
+  },
+  {
+   "id": "w935572025",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 92,
+   "isPart": true
+  },
+  {
+   "id": "w935572028",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 28,
+   "isPart": true
+  },
+  {
+   "id": "w935572029",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 195,
+   "isPart": true
+  },
+  {
+   "id": "w935572030",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 100,
+   "isPart": true
+  },
+  {
+   "id": "w935572039",
+   "name": "Index Tower",
+   "height": 300,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 27,
+   "isPart": true
+  },
+  {
+   "id": "w110407477",
+   "name": "Emirates Crown",
+   "height": 296,
+   "src": "tag",
+   "zone": "marina",
+   "area": 1619,
+   "isPart": false
+  },
+  {
+   "id": "w256973516",
+   "name": "The Tower Plaza Hotel",
+   "height": 295,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1152,
+   "isPart": false
+  },
+  {
+   "id": "w1047612078",
+   "name": "Opera Grand",
+   "height": 288,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 967,
+   "isPart": false
+  },
+  {
+   "id": "w1527242504",
+   "name": "Al Habtoor Tower",
+   "height": 288,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 3408,
+   "isPart": true
+  },
+  {
+   "id": "w203296254",
+   "name": "Millennium Tower",
+   "height": 285,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1415,
+   "isPart": false
+  },
+  {
+   "id": "w1047612077",
+   "name": "Grande Signature Residences",
+   "height": 279,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1984,
+   "isPart": false
+  },
+  {
+   "id": "w934765171",
+   "name": "ICD Brookfield Place",
+   "height": 279,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 2261,
+   "isPart": true
+  },
+  {
+   "id": "w1475241003",
+   "name": "DAMAC Paramount Hotel & Residence Towers",
+   "height": 270,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1089,
+   "isPart": true
+  },
+  {
+   "id": "w1475241004",
+   "name": "DAMAC Paramount Hotel & Residence Towers",
+   "height": 270,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1108,
+   "isPart": true
+  },
+  {
+   "id": "w1475241005",
+   "name": "DAMAC Paramount Hotel & Residence Towers",
+   "height": 270,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 978,
+   "isPart": true
+  },
+  {
+   "id": "w1475241006",
+   "name": "DAMAC Paramount Hotel & Residence Towers",
+   "height": 270,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 978,
+   "isPart": true
+  },
+  {
+   "id": "w125848288",
+   "name": "21st Century Tower",
+   "height": 269,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1021,
+   "isPart": false
+  },
+  {
+   "id": "w257414073",
+   "name": "Voco Dubai",
+   "height": 269,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1247,
+   "isPart": true
+  },
+  {
+   "id": "w946921563",
+   "name": "",
+   "height": 264,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1072,
+   "isPart": true
+  },
+  {
+   "id": "w1529564060",
+   "name": "Tower 1",
+   "height": 262,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1397,
+   "isPart": false
+  },
+  {
+   "id": "w1047612084",
+   "name": "Address Residences Dubai Opera Tower 1",
+   "height": 260,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 1055,
+   "isPart": false
+  },
+  {
+   "id": "w1146969101",
+   "name": "Paramount Hotel Midtown",
+   "height": 258,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 2559,
+   "isPart": false
+  },
+  {
+   "id": "w946921564",
+   "name": "",
+   "height": 257,
+   "src": "tag",
+   "zone": "downtown",
+   "area": 127,
+   "isPart": true
+  }
+ ],
+ "estimatedTall": 50,
+ "overridesUsed": [],
+ "overridesDefined": 33,
+ "parts": {
+  "outlines": 64560,
+  "parts": 785,
+  "outlinesReplaced": 161,
+  "partsKept": 509,
+  "partsDropped": 276
+ },
+ "land": {
+  "polys": 293,
+  "areaM2": 1158031595.7795722,
+  "worldFraction": 0.5757430131438337,
+  "mallOnLand": true,
+  "gulfOnLand": false
+ },
+ "szr": {
+  "lines": 2,
+  "lengthsM": [
+   27751,
+   27572
+  ]
+ },
+ "landmarks": {
+  "burjKhalifa": {
+   "dropped": 37,
+   "footprintId": "w446646206",
+   "rotation": 0.9414
+  },
+  "cayan": {
+   "dropped": 1,
+   "footprintId": "w195527255",
+   "rotation": 0.8803
+  },
+  "museumFuture": {
+   "dropped": 3,
+   "footprintId": "w1054289435",
+   "rotation": 0.895
+  },
+  "ainDubai": {
+   "dropped": 6,
+   "footprintId": "w1047288986",
+   "rotation": 1.7709
+  },
+  "burjAlArab": {
+   "dropped": 4,
+   "footprintId": "w12700546",
+   "rotation": 2.0949
+  }
+ }
+}

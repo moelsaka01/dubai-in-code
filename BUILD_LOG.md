@@ -34,7 +34,7 @@ The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them again
 |---|---|---|---|---|---|---|---|---|
 | 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
 | 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | price not set (Phase 5) |
-| 3 Rendering and landmarks, with review pass | Fable 5.2 | 3 | ~106 min+ | 168 | 337,927 | 26,490,167 | 473,853 | ~$42.29 |
+| 3 Rendering and landmarks, with review and detail passes | Fable 5.2 | 5 | ~372 min wall clock | 212 | 407,754 | 37,890,478 | 1,114,427 | ~$64.46 |
 | 4 Polish and performance | | | | | | | | |
 | 5 README, deploy, launch | | | | | | | | |
 | **Total** | | | | | | | | |
@@ -120,3 +120,19 @@ The cost was never the geometry. It was `EffectComposer` + `UnrealBloomPass` res
 - The preview pane's screenshots crop to the top-left two thirds at 150% display scaling. Several "framing bugs" were that, checked by projecting the landmark to screen coordinates (it was dead centre).
 
 **Not done:** shadows are coarse (11.7 m texels) and get fat with distance; villas cast almost none. Burj Khalifa by day is plain from far away. Bridges are still flat. The frame time was measured with forced frames and `gl.finish()`, not from a long real run.
+
+### Detail pass (2026-11-13)
+
+The review pass fixed the frame rate, and the owner confirmed it. The second note stood: it still looked like Lego. Shadows and better facades had not changed what the city was made of, which was extruded footprints standing on empty ground.
+
+**Added:** podiums under large towers, pitched roofs on villas, plant on flat roofs; 39,000 palms, 8,700 trees, 28,000 street cars, 520 boats, car bodies on the motorways; rooms behind the windows (interior mapping), piers and window reveals; car parks and scrub on the ground; thin cloud in the sky. All of it is derived from the roads, footprints, parks and coastline already in `public/data`. Nothing was added to the data and no asset was loaded.
+
+**Frame time** along the tour at 1920x1080 on Intel Iris Xe: 9.4 to 13.2 ms, against 8.6 to 11.3 ms before the detail. Readings on this laptop drift by 2 to 4 ms between runs, so treat the difference as "a little more", not as a number.
+
+**What went wrong:**
+- The first palm had 74 triangles and there were 52,000 of them. A frame went past 1.2 M triangles. Cut to 36 triangles, wider spacing and a shorter draw distance.
+- Interior mapping and the ground detail ran for every pixel at first. Both now run only where the detail can be seen.
+- At night the water near every shore glowed like lit sand: the "city lights on the water" term was four times too strong.
+- The session was cut off once mid-pass. The work was uncommitted but on disk, and resumed from `git status`.
+
+**Not done:** street cars stand still; car parks ignore street direction; trees and palms cast no shadows; no people.

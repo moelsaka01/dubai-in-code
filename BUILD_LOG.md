@@ -34,12 +34,12 @@ The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them again
 |---|---|---|---|---|---|---|---|---|
 | 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
 | 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | price not set (Phase 5) |
-| 3 Rendering and landmarks | Fable 5.2 | 1 | ~35 min+ | 74 | 202,278 | 8,445,618 | 282,216 | ~$19.36 |
+| 3 Rendering and landmarks, with review pass | Fable 5.2 | 3 | ~106 min+ | 168 | 337,927 | 26,490,167 | 473,853 | ~$42.29 |
 | 4 Polish and performance | | | | | | | | |
 | 5 README, deploy, launch | | | | | | | | |
 | **Total** | | | | | | | | |
 
-Phases 1 and 2 are final figures, read on 2026-11-12 during Phase 3. Phase 3 was measured from inside its own session just before the commits, so it misses the last turns. Re-run `npm run usage` for the exact number.
+Phases 1 and 2 are final figures, read on 2026-11-12 during Phase 3. Phase 3 (including its review pass) was measured from inside its own session just before the last commit, so it misses the final turns. Re-run `npm run usage` for the exact number.
 
 ### Phase 1 — plan and skeleton (2026-11-12)
 
@@ -93,3 +93,30 @@ Phases 1 and 2 are final figures, read on 2026-11-12 during Phase 3. Phase 3 was
 - The OSM min-area rectangle is useless for Y-shaped and wedge-shaped footprints, so Burj Khalifa's wing angles (22.5°, 142.5°, 262.5°) and Burj Al Arab's mast corner and axis (37.6° south of east) were read from the raw outlines.
 
 **Open points for Phase 4:** look at it and tune colours; bloom and window levels at night; the tour is 54 s; bridges are flat; the Metro is a flat ribbon; the Museum's proportions are a compromise between the plan (roughly round) and the 140 m OSM footprint; `.claude/launch.json` (dev server for the preview pane) is untracked.
+
+### Phase 3 review pass (2026-11-12)
+
+The first version was finished without anyone looking at it. Then it was looked at, with screenshots, and the owner's verdict was short: the tour lags, and the whole thing looks fake, like Lego, the Museum of the Future most of all.
+
+**What the screenshots showed:** the water had a regular ripple pattern with moire rings; distant buildings at night were flat grey boxes; Burj Khalifa at night was a pale cutout; the Museum was a fat white doughnut with blue squiggles; a building part floated in the sky over the Marina; the Cayan chip pointed at the back of another tower; Ain Dubai's spokes filled the wheel at night; the chips covered the status line in a narrow window; roads were near-black; car lights showed as blobs by day.
+
+**Frame time.** Measured along the tour at 1920x1080 on Intel Iris Xe:
+
+| | ms per frame |
+|---|---|
+| First version (measured at 1280x720: 9.4 to 12.2 ms, scaled by pixel count) | about 21 to 27 |
+| New shaders and shadows, own bloom chain, 4x MSAA float target | 13.2 to 20.1 |
+| Same, 2x MSAA | 13.4 to 16.0 |
+| Same, no MSAA, FXAA in the final pass (shipped) | 8.6 to 11.3 |
+
+The cost was never the geometry. It was `EffectComposer` + `UnrealBloomPass` resolving a multisampled float target twice a frame. A full shadow-map update costs 18 ms and is spread over 24 frames.
+
+**Realism.** Sun shadows and ambient occlusion from a top-down height map; tower crowns; four facade types with shopfronts, plant floors and parapets; glass that mirrors sky and ground; paving where the city is dense; noise-based water with turquoise shallows and surf; night windows that stay windows at a distance. The Museum of the Future was rebuilt as brushed steel with rows of script. Details and the reasons are in PLAN.md §5.
+
+**What went wrong on the way:**
+- The resolution governor's first version shrank the picture to half size inside the preview pane, where the browser throttles frames. Lower resolution could not help there. Now every reduction is a trial that is undone if the frame time does not improve.
+- Glass towers came out nearly black in the first pass: a mirror seen from above reflects the ground, and the ground colour in the reflection was too dark and the horizon too sharp.
+- Ambient occlusion made the whole Marina look sooty until its strength and range were cut.
+- The preview pane's screenshots crop to the top-left two thirds at 150% display scaling. Several "framing bugs" were that, checked by projecting the landmark to screen coordinates (it was dead centre).
+
+**Not done:** shadows are coarse (11.7 m texels) and get fat with distance; villas cast almost none. Burj Khalifa by day is plain from far away. Bridges are still flat. The frame time was measured with forced frames and `gl.finish()`, not from a long real run.

@@ -17,7 +17,7 @@ Rules for every phase: plan before coding, no screenshots unless asked, no trial
 | Data source | Overpass API, raw JSON cached in `data/raw/` (gitignored) | Area is small; a Geofabrik extract would need osmium and 200 MB+. |
 | Palm scope | Whole Palm (land and buildings), not just trunk + first fronds | The whole Palm bbox holds only ~2 700 buildings, and half a palm reads as a bug. |
 | Triangulation | In the browser, in a Web Worker (`earcut`) | Shipping footprints is ~3× smaller than shipping triangles. |
-| Shadows | None by default. Fake AO at building bases. Optional single shadow map in "High" quality (Phase 4) | A 20 km scene cannot afford cascades at 60 fps on a laptop. |
+| Shadows | Sun shadows and ambient occlusion from a top-down height map of the city (`src/world/cityMap.js`), one texture fetch per fragment. No per-frame shadow pass | A 20 km scene cannot afford cascades at 60 fps on a laptop. Changed in the Phase 3 review: without shadows the city read as toy blocks. |
 
 Measured on 2026-11-12 (Overpass `out count`, world bbox): **100 281** building ways, 413 building relations, 1 097 `building:part` ways, **2 219 with `height` (2.2%)**, **7 636 with `building:levels` (7.6%)**, 6 375 major road ways, 9 150 minor road ways, 245 coastline ways, 197 water ways + 18 water relations.
 So about 90% of heights are estimated. That is the main quality risk (§6).
@@ -202,7 +202,7 @@ If over budget: raise the Tier B area threshold (120 → 200 → 300 m²), then 
 | 0.75 | Blue hour | −6° | deep blue sky, 60% lit, bloom on |
 | 1.00 | Night | −30°, dim moon fill | near-black sky with stars, warm horizon glow band, 70% lit, cars and street lights at full |
 
-Sky dome shader: zenith/horizon gradient, sun disc and glow, stars, city-glow band. Renderer: ACES tone mapping, exposure from `env`. Post: `UnrealBloomPass` at half resolution, strength from `env.night`. Fog is exponential height fog in the shared chunk (Dubai haze is authentic and hides the world edge).
+Sky dome shader: zenith/horizon gradient, sun disc and glow, stars, city-glow band. Renderer: ACES tone mapping, exposure from `env`. Post: own bloom chain at half resolution plus FXAA in one final pass (`src/post.js`, see the review notes in §5), strength from `env.bloom`. Fog is exponential height fog in the shared chunk (Dubai haze is authentic and hides the world edge).
 
 **Camera.** `src/camera/tour.js`: Catmull-Rom splines through position and look-at keyframes, ~40 s, eased. The tour also drives `t` from golden hour to night, so it lands on the night skyline. Route: offshore of Bluewaters (Ain Dubai + JBR) → along the Marina canal past Cayan Tower → climb over the Palm trunk toward Atlantis → down the coast past Burj Al Arab → along Sheikh Zayed Road → rising orbit of Burj Khalifa from the fountain lake. Any input skips it. `src/camera/controls.js`: `OrbitControls` with damping, a ground clamp, and WASD/arrow keys to fly the target.
 
@@ -274,14 +274,25 @@ What Phase 3 built differently from §3 and §4 (read before Phase 4):
 - Varyings can be extrapolated far outside their range on edge-on triangles under MSAA. Never feed one to `exp()` or `pow()` unclamped (this flooded the bloom pass once).
 - `window.__dubai` exposes `stats()` (draw calls, triangles), `frame(now)` and `env.setTime(t)` for checks and for the Phase 4 `?perf` overlay.
 
+**Phase 3 review pass (after the first look, 2026-11-12).** The owner's verdict on the first version: the tour lagged and the city looked like Lego, the Museum of the Future worst of all. What changed, and what a later phase must not undo:
+- **Frame time.** At 1920x1080 on Intel Iris Xe the tour now takes 8.6 to 11.3 ms a frame (before: about 21 to 27 ms). `EffectComposer` + `UnrealBloomPass` are gone. `src/post.js` renders the scene into a float target without MSAA, blurs a half-size bright pass with five dual-filter levels, and one final pass does FXAA + bloom + tone mapping. 4x MSAA on a float target alone cost 6 to 7 ms. Sea and sky are drawn last, so pixels behind land and buildings are never shaded.
+- **Resolution governor** (`govern()` in `src/app.js`). When frames average over 20.5 ms the render scale drops by 18%, down to 0.5. Each drop is a trial: if the frame time does not improve it is undone and locked out, because a throttled tab or a 30 fps cap is not a fill-rate problem. This is the auto quality fallback of task 4.2 in a different form.
+- **Shadows and occlusion** (`src/world/cityMap.js`). After loading, the city is rendered straight down into a 2048^2 height map (11.7 m per texel). From it: a static city map (occlusion height, shore blur, built-up density) and a shadow map that stores, per texel, the height below which a point is in shadow. The shadow map is recomputed in 24 strips over 24 frames when the sun moves more than 0.35 degrees (18 ms for a full update). Every material reads both through `sunLit()`, `cityInfo()` and `cityAO()` in the shared chunk. Walls sample 9 m outside their own footprint.
+- **Buildings.** `src/data/buildingMesh.js` (split from the worker) adds crowns to compact towers of 55 m or more: plant boxes, stepped tops, masts, picked by seed. Floating `building:part` volumes with nothing under them are stood on the ground. The uv attribute is now three floats (bays, height, top of the volume). The shader has four facade types per kind, a shopfront floor, plant floor and parapet, roof plant, weathering, and glass that mirrors sky above and ground below (`envColor()`), each pane tilted slightly. Palette is muted.
+- **Night.** Lit rooms are drawn per window up close, in blocks of 3x3 at mid distance and as a dim average far away. A plain average turned every distant building into a grey box.
+- **Ground, roads, water.** Sand turns to paving where the density map says the city is built up. Asphalt is mid grey with a pale kerb. Water normals come from three noise octaves that fade out when smaller than a few pixels (the sine waves showed moire rings); the shore channel gives turquoise shallows and surf. This is task 4.3.
+- **Museum of the Future.** Rebuilt: slimmer at the top, deeper at the base, leaning, brushed steel with real reflections, and eight rows of script built from strokes chosen per letter by a hash.
+- Also fixed: the Cayan chip view (was blocked by a tower), Ain Dubai's spokes at night, the chips overlapping the status line under 720 px, car lights visible as blobs by day.
+- Known limits: shadows are soft and coarse (11.7 m texels) and widen with distance; low villas cast almost none. Daylight Burj Khalifa is plain at a distance. The screenshot tool of the preview pane crops at 150% display scaling; shrink the canvas to 66.667% in the page to see whole frames.
+
 ### Phase 4 — polish and performance
 - [ ] 4.1 Measure: draw calls, triangles, frame time at 5 fixed camera spots (`?perf` overlay). Fix the worst first
-- [ ] 4.2 Auto quality fallback, DPR cap, LOD distances tuned
-- [ ] 4.3 Water shore mask (shallows, foam, night glow)
+- [ ] 4.2 Auto quality fallback, DPR cap, LOD distances tuned (the fallback exists as the resolution governor; LOD distances are still untuned)
+- [x] 4.3 Water shore mask (shallows, foam, night glow) — done in the Phase 3 review pass, from the city map's shore channel
 - [ ] 4.4 Night pass: window colour mix, beacons, horizon glow, bloom tuning, SZR light streaks
 - [ ] 4.5 Tour timing and framing; share URL params (`?t=`, `?cam=`, `?notour`); `H` hides the UI for recording
 - [ ] 4.6 Mobile/touch sanity, WebGL-unavailable message, loading screen
-- [ ] 4.7 Stretch: fountain, Metro viaduct, optional shadow map
+- [ ] 4.7 Stretch: fountain, Metro viaduct (shadows are done, see the review pass above)
 - [ ] 4.8 Update `BUILD_LOG.md`
 
 ### Phase 5 — README, deploy, launch

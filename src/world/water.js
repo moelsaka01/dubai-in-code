@@ -65,7 +65,7 @@ export function createWater(env) {
         float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
         vec3 R = reflect(-V, n);
         R.y = abs(R.y);
-        float lit = sunLit(vWorldPos + vec3(0.0, 1.0, 0.0));
+        float lit = sunLight(vWorldPos, vec3(0.0, 1.0, 0.0));
         vec3 light = hemi(vec3(0.0, 1.0, 0.0)) + uLightColor * (max(uLightDir.y, 0.0) * 0.45 * lit);
 
         // Shallows: turquoise over sand near any shore, with a broken line of surf where the land starts.

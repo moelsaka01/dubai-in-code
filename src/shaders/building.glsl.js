@@ -56,19 +56,13 @@ void main() {
   if (abs(n.y) > 0.5) {
     // ---- roofs and undersides ----
     vec4 info = cityInfo(vWorldPos);
-    float lit = sunLit(vWorldPos + vec3(0.0, 1.5, 0.0));
+    float lit = sunLight(vWorldPos, n);
     vec3 albedo = vColor;
-    vec2 rc = vWorldPos.xz / 2.8;
-    vec2 rw = fwidth(rc);
-    float near = 1.0 - smoothstep(0.3, 0.9, max(rw.x, rw.y));
-    vec2 rcell = floor(rc), rf = fract(rc);
-    float rh = hash21(rcell + vSeed);
-    // Plant: chillers, tanks and lift overruns scattered over flat roofs.
-    float unit = step(0.84, rh) * step(0.18, rf.x) * step(rf.x, 0.82) * step(0.18, rf.y) * step(rf.y, 0.82) * (1.0 - villa);
-    albedo = mix(albedo, albedo * mix(0.5, 1.45, hash21(rcell * 1.7 + 3.0)), unit * near);
-    // Tiled villa roofs: ridges.
-    albedo *= mix(1.0, 0.84 + 0.16 * sin(dot(vWorldPos.xz, vec2(0.8, 0.6)) * 2.4), villa * near);
-    albedo *= 0.86 + 0.26 * vnoise(vWorldPos.xz * 0.16 + vSeed);
+    vec2 rw = fwidth(vWorldPos.xz);
+    float near = 1.0 - smoothstep(0.3, 0.9, max(rw.x, rw.y) / 2.8);
+    // Tiled villa roofs: ridges. Flat roofs stay plain; their plant is real geometry.
+    albedo *= mix(1.0, 0.88 + 0.12 * sin(dot(vWorldPos.xz, vec2(0.8, 0.6)) * 2.4), villa * near);
+    albedo *= 0.92 + 0.14 * vnoise(vWorldPos.xz * 0.11 + vSeed);
     col = shade(albedo, n, lit, cityAO(vWorldPos, info));
   } else {
     // ---- walls ----
@@ -95,7 +89,7 @@ void main() {
     lo = mix(lo, vec2(-0.2, 0.34), plain * s1);  hi = mix(hi, vec2(1.2, 0.80), plain * s1);  // ribbon
     lo = mix(lo, vec2(0.10, 0.08), plain * s2);  hi = mix(hi, vec2(0.90, 0.72), plain * s2);  // balcony doors
     lo = mix(lo, vec2(0.12, 0.20), plain * s3);  hi = mix(hi, vec2(0.88, 0.84), plain * s3);  // large punched
-    lo = mix(lo, vec2(0.03, 0.08), glass);       hi = mix(hi, vec2(0.97, 0.92), glass);       // curtain wall
+    lo = mix(lo, vec2(0.02, 0.05), glass);       hi = mix(hi, vec2(0.98, 0.95), glass);       // curtain wall
     lo = mix(lo, vec2(0.12, 0.04), glass * s1);  hi = mix(hi, vec2(0.88, 0.96), glass * s1);  // fins
     lo = mix(lo, vec2(-0.2, 0.30), glass * s2);  hi = mix(hi, vec2(1.2, 0.92), glass * s2);   // glass ribbon
     lo = mix(lo, vec2(0.015, 0.03), glass * s3); hi = mix(hi, vec2(0.985, 0.97), glass * s3); // monolith
@@ -108,7 +102,7 @@ void main() {
     // Zones up the wall: shopfront, typical floors, plant floor, parapet.
     float tower = step(70.0, top);
     float parapet = step(top - 1.1, y);
-    float plant = tower * step(top - 1.1 - floorH * 1.6, y) * (1.0 - parapet);
+    float plant = tower * step(top - 1.1 - floorH * 1.6, y) * (1.0 - parapet) * (1.0 - glass); // glass towers are glazed to the top
     float ground = (1.0 - step(4.4, y)) * (1.0 - villa);
     float typical = (1.0 - ground) * (1.0 - parapet) * (1.0 - plant);
     float win = mix(cover, e.x * e.y, detail) * hasWin * typical;
@@ -121,21 +115,21 @@ void main() {
     float h3 = hash21(cell * 2.3 + vSeed * 1.9 + 5.0);
 
     // Wall material: mullions on glass towers, weathered render or stone elsewhere.
-    vec3 wallAlbedo = mix(vColor, vColor * 0.4, glass);
+    vec3 wallAlbedo = mix(vColor, vColor * 0.6, glass);
     wallAlbedo = mix(wallAlbedo, vColor * 0.85, glass * s2);             // spandrel panels between glass ribbons
-    wallAlbedo *= 0.84 + 0.24 * vnoise(vec2(vUv.x * 0.37, y * 0.11) + vSeed);
+    wallAlbedo *= 0.91 + 0.14 * vnoise(vec2(vUv.x * 0.21, y * 0.06) + vSeed);
     float joint = (1.0 - smoothstep(0.0, 0.05 + fw.y, f.y)) * detail * (1.0 - glass);
     wallAlbedo *= 1.0 - 0.16 * joint * typical;                          // floor joints
     float slab = smoothstep(0.84 - fw.y, 0.84 + fw.y, f.y) * plain * s2 * typical * detail;
     wallAlbedo = mix(wallAlbedo, vColor * 1.12, slab);                   // balcony slab edges catch the light
     float under = smoothstep(0.50, 0.84, f.y) * (1.0 - slab) * plain * s2 * typical * detail;
-    float louvre = 0.55 + 0.3 * step(0.5, fract(y * 2.2));
-    wallAlbedo *= mix(1.0, mix(0.7, louvre, detail), plant);
+    float louvre = 0.74 + 0.16 * step(0.5, fract(y * 2.2));
+    wallAlbedo *= mix(1.0, mix(0.82, louvre, detail), plant);
     wallAlbedo *= mix(1.0, 1.1, parapet);
 
     // Light: sample the city maps a little outside our own footprint.
     vec3 outside = vWorldPos + n * 9.0;
-    float lit = sunLit(outside);
+    float lit = sunLight(vWorldPos, n);
     vec4 info = cityInfo(outside);
     float ao = cityAO(vWorldPos, info) * mix(0.75, 1.0, smoothstep(0.0, 10.0, y));
     // Piers between bays: tilt the normal on either side of each bay line so the wall has relief in raking light.
@@ -143,11 +137,12 @@ void main() {
     float pier = ((1.0 - smoothstep(0.0, 0.07, f.x)) - smoothstep(0.93, 1.0, f.x)) * detail * typical * (1.0 - glass * s3);
     vec3 wall = shade(wallAlbedo, normalize(n + along * (pier * 0.7)), lit, ao * (1.0 - 0.45 * under));
 
-    // Glass: a mirror of the sky and the city, each pane tilted a hair so a facade does not reflect as one sheet.
+    // Glass: a mirror of the sky, its clouds and the city. Panes of a curtain wall are almost perfectly flat, so
+    // a facade reflects as one smooth sheet; older punched windows wobble a little more.
     vec3 R = reflect(-V, n);
-    R = normalize(R + (vec3(h1, h2, h3) - 0.5) * (0.07 * detail));
+    R = normalize(R + (vec3(h1, h2, h3) - 0.5) * (mix(0.03, 0.004, glass) * detail));
     float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
-    vec3 mirror = envColor(R) * mix(0.75, 1.0, ao);
+    vec3 mirror = (glass > 0.5 ? envColor(R) : envPlain(R)) * mix(0.75, 1.0, ao) * mix(0.62, 1.0, smoothstep(0.0, 90.0, y)); // low floors mirror the street, not the sky
     vec3 tint = mix(vec3(1.0), vColor * 3.0, glass * 0.55);
     // A room behind every window (interior mapping): cast the view ray into a box one bay wide, one floor high
     // and five metres deep, and shade whichever surface it hits. Windows get depth and parallax for a few
@@ -167,12 +162,12 @@ void main() {
       surface = mix(surface, mix(0.38, 1.0, step(0.0, rd.y)), isLevel); // floor, ceiling
       vec2 bw = hit.xy / size.xy;
       surface *= 1.0 - 0.35 * isBack * step(hash21(cell * 3.3 + floor(bw * vec2(3.0, 2.0)) + vSeed), 0.35) * step(bw.y, 0.55); // furniture, doors
-      curtain = step(0.7, hash21(cell * 4.1 + vSeed * 2.3)) * detail; // some have blinds drawn
+      curtain = step(0.7, hash21(cell * 4.1 + vSeed * 2.3)) * detail * (1.0 - glass); // some have blinds drawn
       room = mix(mix(0.55, surface / (1.0 + th * 0.22), detail), 0.7, curtain);
     }
     vec3 roomTint = mix(vec3(0.72, 0.68, 0.60), vec3(0.58, 0.62, 0.68), h2);
-    vec3 interior = roomTint * room * mix(0.16, 0.5, curtain);
-    interior = mix(interior, interior * 0.6 + vColor * 0.16, glass); // tinted glass has a body colour of its own
+    vec3 interior = roomTint * room * mix(0.16, 0.34, curtain);
+    interior = mix(interior, interior * 0.2 + vColor * 0.2, glass); // tinted glass has a body colour of its own and hides the rooms by day
     float reflectance = mix(0.5, 0.9, glass) * (0.5 + 0.5 * fres);
     vec3 glassCol = shade(interior, n, lit, ao) * (1.0 - 0.4 * under) + mirror * tint * reflectance;
     glassCol += uLightColor * (pow(max(dot(R, uLightDir), 0.0), 64.0) * lit * mix(0.5, 1.3, glass));

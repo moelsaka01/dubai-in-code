@@ -39,25 +39,19 @@ export function createLand(env) {
         float drift = vnoise(vWorldPos.xz * 0.0035) * 0.6 + vnoise(vWorldPos.xz * 0.03) * 0.4;
         vec3 sand = mix(vec3(0.47, 0.39, 0.25), vec3(0.56, 0.48, 0.33), drift);
         float paving = vnoise(vWorldPos.xz * 0.012 + 40.0);
-        vec3 paved = mix(vec3(0.34, 0.32, 0.29), vec3(0.44, 0.41, 0.36), paving);
+        vec3 paved = mix(vec3(0.38, 0.365, 0.34), vec3(0.45, 0.43, 0.395), paving);
         float urban = smoothstep(0.02, 0.30, info.a * 0.6 + info.b * 0.6);
         vec3 albedo = mix(sand, paved, urban * 0.85);
 
-        // Detail that only shows close up: car parks in the built-up blocks, scrub on the open sand.
+        // Kept plain on purpose. Painted patterns (parking bays, plot lines) read as a printed texture from the
+        // air; soft tone changes read as ground. The only close-up detail is scrub on open sand.
         vec2 pw = fwidth(vWorldPos.xz);
         float near = 1.0 - smoothstep(0.25, 1.4, max(pw.x, pw.y));
-        float lot = smoothstep(0.55, 0.62, vnoise(vWorldPos.xz / 70.0 + 7.0)) * urban;
-        albedo = mix(albedo, vec3(0.15, 0.15, 0.155), lot * 0.85);
+        albedo *= 0.94 + 0.12 * vnoise(vWorldPos.xz / 55.0 + 7.0);
         if (near > 0.001) {
-          vec2 lp = vWorldPos.xz / vec2(2.6, 5.5);
-          float bays = step(0.5, fract(lp.y * 0.5));                   // rows of bays alternate with aisles
-          float line = (1.0 - smoothstep(0.03, 0.03 + pw.x / 2.6, abs(fract(lp.x) - 0.5))) * bays;
-          float parked = step(0.45, hash21(floor(lp))) * bays * step(0.12, fract(lp.x)) * step(fract(lp.x), 0.88) * step(0.1, fract(lp.y)) * step(fract(lp.y), 0.9);
-          albedo = mix(albedo, vec3(0.62), line * lot * near);
-          albedo = mix(albedo, mix(vec3(0.75), vec3(0.08), step(0.6, hash21(floor(lp) + 5.0))), parked * lot * near * 0.9);
           vec2 sc = vWorldPos.xz / 6.0;
-          float scrub = step(0.88, hash21(floor(sc))) * (1.0 - smoothstep(0.10, 0.20, length(fract(sc) - 0.5))) * (1.0 - urban) * near;
-          albedo = mix(albedo, vec3(0.17, 0.19, 0.10), scrub * 0.8);
+          float scrub = step(0.9, hash21(floor(sc))) * (1.0 - smoothstep(0.10, 0.20, length(fract(sc) - 0.5))) * (1.0 - urban) * near;
+          albedo = mix(albedo, vec3(0.17, 0.19, 0.10), scrub * 0.6);
         }
 
         float tuft = vnoise(vWorldPos.xz * 0.09);
@@ -66,7 +60,7 @@ export function createLand(env) {
         albedo = mix(albedo, vec3(0.66, 0.59, 0.43) * (0.92 + 0.16 * drift), isBeach);
         albedo = mix(albedo, vec3(0.30, 0.28, 0.25), wall);
 
-        float lit = sunLit(vWorldPos + vec3(0.0, 0.5, 0.0));
+        float lit = sunLight(vWorldPos, vec3(0.0, 1.0, 0.0));
         float ao = cityAO(vWorldPos, info);
         vec3 top = shade(albedo, vec3(0.0, 1.0, 0.0), lit, ao);
         vec3 side = albedo * (hemi(vec3(1.0, 0.0, 0.0)) + uLightColor * 0.35);

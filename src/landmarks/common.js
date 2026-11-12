@@ -277,7 +277,7 @@ export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = T
         ${body}
         // Sun shadow and occlusion from the city maps, sampled a little outside the surface.
         vec3 outside = vWorldPos + n * 9.0;
-        float lit = sunLit(outside);
+        float lit = sunLight(vWorldPos, n);
         float ao = cityAO(vWorldPos, cityInfo(outside));
         vec3 col = shade(albedo, n, lit, ao);
         vec3 R = reflect(-V, n);

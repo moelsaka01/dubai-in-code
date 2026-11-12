@@ -26,13 +26,7 @@ export function createSky(env) {
         float above = smoothstep(-0.015, 0.02, d.y);
 
         // High thin cloud: streaks of noise on a flat layer far overhead, lit by the sky and the low sun.
-        if (d.y > 0.02) {
-          vec2 cp = d.xz / (d.y + 0.12) * 1.6 + vec2(uTime * 0.004, 0.0);
-          float c = vnoise(cp * vec2(1.0, 2.6)) * 0.62 + vnoise(cp * vec2(2.9, 6.5) + 9.0) * 0.38;
-          float cover = smoothstep(0.52, 0.80, c) * smoothstep(0.02, 0.25, d.y) * mix(0.55, 0.3, uNight);
-          vec3 cloud = uAmbSky * 2.2 + uLightColor * 0.9 + uSkyHorizon * 0.25 + uSkyGlow * (0.5 * pow(max(dot(d, uSunDir), 0.0), 3.0));
-          col = mix(col, cloud, cover);
-        }
+        col = mix(col, cloudColor(d), cloudCover(d));
 
         float mu = dot(d, uSunDir);
         col += uSunDisc * above * (smoothstep(0.99990, 0.99996, mu) + 0.02 * pow(max(mu, 0.0), 1200.0));

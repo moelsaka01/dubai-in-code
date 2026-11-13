@@ -68,7 +68,7 @@ float vnoise(vec2 p) {
 // Analytic sky: used by the dome, by reflections and as the fog colour.
 vec3 skyColor(vec3 d) {
   float h = max(d.y, 0.0);
-  float k = mix(3.5, 9.0, uNight);
+  float k = mix(3.5, 13.0, uNight); // at night the glow of the city hugs the horizon
   // With the sun low, the horizon is only orange toward it; the far side of the sky is cool and dimmer. The fog
   // takes its colour from here too, so haze and reflections stop being one colour in every direction.
   float toward = dot(normalize(d.xz + 1e-5), normalize(uSunDir.xz + 1e-5)) * 0.5 + 0.5;

@@ -105,9 +105,13 @@ export function create(env) {
         float frame = mix(0.4, max(band, post * 0.7), detail);
         albedo = mix(vec3(0.07, 0.16, 0.26), vec3(0.88, 0.89, 0.90), frame);
         gloss = mix(0.85, 0.1, frame);
-        float share = uLitFraction * 0.4;
-        float lit = mix(share, step(hash21(floor(g) + 5.0), share), detail);
-        emissive = (vec3(1.0, 0.8, 0.5) * lit * (1.0 - frame) * 0.9 + vec3(0.10, 0.12, 0.16) * frame) * uNight;
+        // Suites are two floors high and several bays wide, so light comes in runs here too.
+        vec2 cell = floor(g);
+        float share = uLitFraction * 0.6;
+        float hr = hash21(vec2(floor((cell.x + floor(hash11(cell.y * 3.7) * 3.0)) / 3.0), cell.y) + 5.0);
+        float tone = fract(hr * 17.3);
+        float lit = mix(share * 0.4, step(hr, share) * (0.2 + 0.8 * tone * tone), detail);
+        emissive = (mix(vec3(1.0, 0.54, 0.22), vec3(1.0, 0.80, 0.52), tone) * lit * (1.0 - frame) * 0.8 + vec3(0.10, 0.12, 0.16) * frame) * uNight;
       }
     `,
   });

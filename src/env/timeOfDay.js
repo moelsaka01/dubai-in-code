@@ -23,7 +23,7 @@ const KEYS = [
   { t: 0.75, el: -6, az: 296, zenith: S(0x0e1c44), horizon: S(0x5a4f78), glow: S(0xff5a30, 0.45), sun: L(0.3, 0.12, 0.05),
     ambSky: L(0.04, 0.055, 0.11), ambGround: L(0.04, 0.032, 0.03), water: S(0x0a1a38), fog: 7.0e-5, exposure: 1.1, night: 0.8, lit: 0.45, bloom: 0.32, stars: 0.25 },
   // Night: the haze over the city is lit from below, so the horizon is a dull amber and distance fades into it.
-  { t: 1.0, el: -30, az: 310, zenith: S(0x060a16), horizon: S(0x54361f), glow: S(0x000000), sun: L(0, 0, 0),
+  { t: 1.0, el: -30, az: 310, zenith: S(0x060a16), horizon: S(0x40301f), glow: S(0x000000), sun: L(0, 0, 0),
     ambSky: L(0.028, 0.036, 0.058), ambGround: L(0.06, 0.042, 0.026), water: S(0x03080f), fog: 8.0e-5, exposure: 1.15, night: 1, lit: 0.55, bloom: 0.42, stars: 1 },
 ];
 const SCALARS = ['el', 'az', 'fog', 'exposure', 'night', 'lit', 'bloom', 'stars'];

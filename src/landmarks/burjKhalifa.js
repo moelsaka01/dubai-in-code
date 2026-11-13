@@ -83,15 +83,23 @@ export function create(env) {
         metal = 0.5 * (1.0 - frame); // coated glass: it mirrors the sky at every angle, which is what makes the tower silver-blue
 
         vec2 cell = floor(g);
-        float share = uLitFraction * 0.35;
-        float lit = mix(share * 0.35, step(hash21(cell + 3.0), share), detail);
-        float sparkle = mix(0.008, step(0.992, hash21(cell * 0.73 + floor(uTime * 4.0) * 7.0)), detail);
-        // After dark the tower is not floodlit evenly: it is dim at the foot, brighter toward the top, banded by
-        // its mechanical floors, with scattered lit rooms and the LED sparkle running over it.
-        float rise = 0.35 + 0.65 * smoothstep(0.0, 620.0, y);
-        float bandGlow = 0.7 + 0.5 * step(0.86, fract(y / 104.0));
-        vec3 e = vec3(0.80, 0.90, 1.0) * (0.035 * rise * bandGlow + 0.9 * lit * (1.0 - frame)) + vec3(2.5) * sparkle;
-        emissive = mix(e, vec3(0.9, 0.95, 1.0) * 0.6, spire) * uNight;
+        float share = uLitFraction * 0.3;
+        float hr = hash21(vec2(floor(cell.x / 3.0), cell.y) + 3.0);
+        float lit = mix(share * 0.4, step(hr, share) * (0.2 + 0.8 * fract(hr * 17.3)), detail);
+        float sparkle = mix(0.006, step(0.994, hash21(cell * 0.73 + floor(uTime * 4.0) * 7.0)), detail);
+        // After dark the tower is lit the way it is built. Every setback terrace throws light up the tier above
+        // it, so each tier is bright at its foot and fades toward the next terrace; the steel fins catch that
+        // light; the top third is brighter than the foot; a slow pulse climbs the shaft; and the spire is white.
+        float tier = ${(SETBACKS - 1).toFixed(1)} * pow(clamp((y - 46.0) / ${(WING_TOP - 46).toFixed(1)}, 0.0, 1.0), ${(1 / 0.92).toFixed(4)});
+        float up = fract(tier);
+        float wash = exp(-up * 3.2) + 0.35 * smoothstep(0.90, 1.0, up);
+        float rise = 0.45 + 0.55 * smoothstep(0.0, 620.0, y);
+        float pulse = 0.82 + 0.18 * sin(y / 55.0 - uTime * 0.7);
+        float fins = mix(0.55, 0.25 + 0.9 * fin, detail);
+        vec3 e = vec3(0.78, 0.88, 1.0) * ((0.03 + 0.22 * wash) * rise * pulse * fins)
+          + vec3(1.0, 0.80, 0.56) * (0.5 * lit * (1.0 - frame) * (1.0 - smoothstep(380.0, 520.0, y)))
+          + vec3(2.5) * sparkle;
+        emissive = mix(e, vec3(0.9, 0.95, 1.0) * 0.75, spire) * uNight;
       }
     `,
   });

@@ -229,12 +229,26 @@ void main() {
     col += wallAlbedo * vec3(1.0, 0.62, 0.34) * (uNight * (0.22 * exp(-y / 10.0) + 0.09 * exp(-y / 110.0)) * (0.35 + 0.65 * info.a));
     // And the glow of the sky over the city on the whole facade: without it a dark tower is a hole with lights on.
     col += vColor * vec3(0.55, 0.62, 0.85) * (uNight * 0.055);
-    // Crown and setback lighting: a band of light at the top of each tier of a tall tower, in white, amber or blue.
-    float accent = step(110.0, top) * step(0.62, hash11(vSeed * 4.7 + 1.0)) * step(top - 1.5, y) * (1.0 - step(top - 0.3, y));
+    // Architectural lighting. About half of the tall towers have one scheme each, in white, amber, blue or teal:
+    // a line of light at the top of every tier, LED strips up the corners, a crown washed with light from above,
+    // or floodlights on the podium that fade up the shaft. The rest stay dark, which is what makes these read.
+    float scheme = hash11(vSeed * 4.7 + 1.0);
     float pick = hash11(vSeed * 9.3 + 2.0);
-    vec3 accentCol = mix(vec3(0.90, 0.95, 1.0), vec3(1.0, 0.70, 0.36), step(0.4, pick));
-    accentCol = mix(accentCol, vec3(0.30, 0.55, 1.0), step(0.75, pick));
-    col += accentCol * (accent * uNight * 0.9);
+    vec3 accentCol = mix(vec3(0.90, 0.95, 1.0), vec3(1.0, 0.66, 0.32), step(0.38, pick));
+    accentCol = mix(accentCol, vec3(0.28, 0.52, 1.0), step(0.70, pick));
+    accentCol = mix(accentCol, vec3(0.20, 0.85, 0.80), step(0.90, pick));
+    float tall = step(110.0, top);
+    float in1 = step(0.50, scheme) * step(scheme, 0.62), in2 = step(0.62, scheme) * step(scheme, 0.74);
+    float in3 = step(0.74, scheme) * step(scheme, 0.87), in4 = step(0.87, scheme);
+    float line = step(top - 1.5, y) * (1.0 - step(top - 0.3, y));
+    // A strip 0.4 m wide where each wall starts, so every corner has one. Narrower than a pixel it keeps its
+    // share of the pixel instead of flickering in and out.
+    float stripW = mix(0.13, 0.26, glass);
+    float strip = clamp((stripW - g.x) / fw.x + 0.5, 0.0, min(1.0, stripW / fw.x + 0.25)) * (1.0 - ground);
+    float crown = smoothstep(top - 16.0, top - 1.0, y);
+    float flood = exp(-max(y - 6.0, 0.0) / 22.0) * step(6.0, y);
+    float accent = tall * (in1 * line * 0.9 + in2 * strip * 1.3 + in3 * crown * crown * 0.30) + in4 * tower * flood * 0.16;
+    col += accentCol * mix(vec3(1.0), wallAlbedo * 2.2, (in3 + in4) * 0.7) * (accent * uNight);
   }
 
   col = applyFog(col, vWorldPos);

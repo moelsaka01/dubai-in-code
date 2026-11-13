@@ -56,9 +56,15 @@ export function create(env) {
         float frame = mix(0.4, max(column, slab), detail);
         albedo = mix(vec3(0.07, 0.10, 0.13), vec3(0.70, 0.71, 0.70), frame);
         gloss = mix(0.85, 0.15, frame);
-        float share = uLitFraction * 0.45;
-        float lit = mix(share, step(hash21(floor(g) + 9.0), share), detail);
-        emissive = (vec3(1.0, 0.76, 0.46) * lit * (1.0 - frame) * 0.9 + vec3(0.03, 0.035, 0.05)) * uNight;
+        // Night: flats lit in short runs, most of them dim, and a soft cool light on the columns and slab edges
+        // so the helix still reads after dark. (A hash per window made a white checkerboard.)
+        vec2 cell = floor(g);
+        float share = uLitFraction * 0.5;
+        float hr = hash21(vec2(floor((cell.x + floor(hash11(cell.y * 3.7) * 3.0)) / 3.0), cell.y) + 9.0);
+        float tone = fract(hr * 17.3);
+        float lit = mix(share * 0.4, step(hr, share) * (0.15 + 0.85 * tone * tone) * step(0.2, hash21(cell + 4.0)), detail);
+        vec3 lamp = mix(vec3(1.0, 0.50, 0.20), vec3(1.0, 0.78, 0.50), tone);
+        emissive = (lamp * lit * (1.0 - frame) * 0.75 + vec3(0.036, 0.042, 0.055) * frame + vec3(0.012, 0.015, 0.022)) * uNight;
       }
     `,
   });

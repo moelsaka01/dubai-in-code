@@ -75,7 +75,7 @@ export function create(env) {
       albedo = mix(steelCol, vec3(0.015, 0.018, 0.022), glyph);
       gloss = mix(0.78, 0.92, glyph);
       metal = 0.55 * (1.0 - glyph); // brushed, not chrome: it keeps a silver body under the reflection
-      emissive = (vec3(1.0, 0.96, 0.88) * glyph * 1.3 + vec3(0.025, 0.03, 0.04)) * uNight;
+      emissive = (vec3(1.0, 0.96, 0.88) * glyph * 0.8 + vec3(0.025, 0.03, 0.04)) * uNight;
     `,
   });
 

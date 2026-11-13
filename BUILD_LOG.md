@@ -154,3 +154,17 @@ Third verdict: still fake. This time the question went back to the owner in thre
 - Stashing files under a running dev server produced one HTTP 500 for a missing module. Harmless, but it stays in the browser console and looked like a new error twice.
 
 **Not done:** trees and bridges cast no crisp shadows; street cars under raised decks; Low quality is unchanged.
+
+### Evening and night pass (2026-11-13)
+
+The owner looked at the screenshots from the lighting pass: day better, evening short on definition, night still fake.
+
+**Evening.** Looking at one view at t = 0.5 showed a single orange-brown tone: orange sky all round, orange haze, windows reflecting sand. Three changes fixed most of it: an orange horizon only toward the sun, windows that reflect the sky they face, and a stronger sun against a cooler fill. Plus a sharpening step.
+
+**Night.** The same view at t = 1 showed a checkerboard of white squares on black. Lit rooms now come in horizontal runs with amber-to-white lamp colours, and the city lights its own walls, ground, roads and water. Close to a building it now looks like a building at night. From the air the street network glows under an amber haze.
+
+**What went wrong:**
+- The first version of the runs came out white, with crown lights as thick glowing hoops. Brightness above about 0.8 is bleached by the tone curve, so lamp light has to stay dim to stay amber; the crown band went from 2.8 m to 1.2 m and from 45% to 38% of towers.
+- Mid-distance window blocks were uniform, which read as tiles. They now vary in brightness.
+
+**Not done:** real architectural lighting on towers (edges, facades); moving traffic on ordinary streets; the mid-distance window blocks are still visible as blocks.

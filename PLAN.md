@@ -304,6 +304,15 @@ What Phase 3 built differently from §3 and §4 (read before Phase 4):
 - Frame time along the tour at 1920x1080 on Intel Iris Xe: 12.3 to 16.8 ms, against 8.8 to 13.3 ms for the previous commit measured minutes apart. The governor takes the heaviest views down to 0.82 scale (13 ms). Do not add per-pixel noise to reflections or raise the shadow refresh rate without measuring both back to back: readings drift with the laptop's temperature.
 - Limits: shadows inside the box are sharp, outside it still soft. A raised bridge that continues in the next tile ramps down at the tile edge. Street cars under a raised deck are not removed. Low quality has none of this.
 
+**Evening and night pass (2026-11-13).** Fourth verdict, after the owner saw the screenshots: day is better, the evening lacks definition, night still looks fake.
+- **Why the evening was mush.** The sky was orange in every direction, so the haze and every reflection were orange too, and the fill light was warm. `skyColor()` now keeps the orange horizon toward a low sun only; the far side is cool and dimmer. Golden hour and sunset have a stronger sun against a cooler, dimmer fill, less haze, and the sun stays 2.5° up at t = 0.64 so shadows last through sunset.
+- **Windows mirror the sky they face** (`Rs` in the building shader), not the ground under the viewer. From the air a true mirror shows sand, which turned every facade brown.
+- **Sharpening.** An unsharp mask in the final pass, from the four taps FXAA already takes.
+- **Why night was fake.** Lit windows were a random checkerboard of large squares on black walls. Light now comes in runs: a flat spans 2 to 4 bays, an office floor is in use or dark as a whole (6 to 14 bays), bays inside a run vary and some are blinded. Glass towers have half-width bays. Lamp colour runs from amber to neutral white and is kept below the level where the tone curve bleaches it. Lit windows start later (4% at golden hour, 55% at night).
+- **The city lights itself.** Stronger sodium wash on lower walls, lit ground in built-up blocks, brighter road pools and street lights, amber haze on the horizon, light streaks on water near the shore, head and tail lights on three street cars in five, and a thin band of white, amber or blue at the top of each tier on about four tall towers in ten.
+- Frame time along the tour at 1920x1080 on Intel Iris Xe: 13.3 to 19.4 ms (previous commit 12.3 to 16.8 ms, measured on another run; treat as "about the same"). The governor trims resolution in the heaviest views.
+- Limits: at mid distance lit windows are still blocks (6 bays by 2 floors). Crown lights follow tier tops, not real architectural lighting. Night in Low quality has no bloom.
+
 ### Phase 4 — polish and performance
 - [ ] 4.1 Measure: draw calls, triangles, frame time at 5 fixed camera spots (`?perf` overlay). Fix the worst first
 - [ ] 4.2 Auto quality fallback, DPR cap, LOD distances tuned (the fallback exists as the resolution governor; LOD distances are still untuned)

@@ -232,3 +232,38 @@ body.hud-hidden #panel,
 body.hud-hidden #perf {
   display: none;
 }
+
+/* Fatal message: no WebGL 2, or the city data did not load. */
+#fatal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  background: var(--bg);
+  z-index: 5;
+}
+
+#fatal p {
+  margin: 0;
+  max-width: 34em;
+  font-size: 17px;
+}
+
+#fatal .detail {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+body.failed #credit {
+  z-index: 6;
+}
+
+body.failed #panel,
+body.failed #chips {
+  display: none;
+}

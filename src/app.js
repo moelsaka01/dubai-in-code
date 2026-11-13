@@ -18,6 +18,7 @@ import { createTour } from './camera/tour.js';
 import { createUI } from './ui/ui.js';
 import { createPerf } from './ui/perf.js';
 import { parseParams } from './ui/params.js';
+import { showFatal } from './ui/fatal.js';
 import { createPost } from './post.js';
 
 // lodFar: beyond it a tile draws only its >= 40 m buildings. minorFar: beyond it class >= 4 roads are hidden.
@@ -191,7 +192,7 @@ export function createApp(canvas) {
 
   // ---- loop ----
   let last = performance.now();
-  let loaded = false;
+  let loaded = false, tourPending = false;
   function frame(now) {
     const last0 = last;
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
@@ -216,6 +217,10 @@ export function createApp(canvas) {
     clouds.update();
     post.render(env, q.bloom, dt);
     if (perf) perf.tick(now - last0, now);
+    if (tourPending) {
+      tourPending = false;
+      if (autoTour) startTour();
+    }
   }
   renderer.setAnimationLoop(frame);
 
@@ -239,6 +244,7 @@ export function createApp(canvas) {
       },
       onProgress: (f) => ui.setProgress(f),
     });
+    if (result.total && result.failed === result.total) throw new Error('every data file failed to load');
     const count = city.manifest.counts.buildings.toLocaleString('en-US');
     ui.setStatus(result.failed
       ? `${result.failed} of ${result.total} data files failed to load. See the console.`
@@ -250,11 +256,11 @@ export function createApp(canvas) {
     props.build();
     loaded = true;
     last = performance.now();
-    if (autoTour) startTour();
+    tourPending = true; // the tour starts at the end of the first frame that has the city in it
     return result;
   })().catch((err) => {
     console.error(err);
-    ui.setStatus('Could not load the city data. Run "npm run data:build", then reload.');
+    showFatal('Could not load the city data.', 'Run "npm run data:build" if you are working from the source, then reload. Details are in the console.');
     throw err;
   });
 

@@ -34,8 +34,9 @@ The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them again
 |---|---|---|---|---|---|---|---|---|
 | 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
 | 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | price not set (Phase 5) |
-| 3 Rendering and landmarks, with review, detail and lighting passes | Fable 5.2 | 5 | ~372 min wall clock | 212 | 407,754 | 37,890,478 | 1,114,427 | ~$64.46 |
-| 4 Polish and performance | | | | | | | | |
+| 3 Rendering and landmarks, with four review passes (v0.1.0) | Fable 5.2 | 9 | ~19 h wall clock | 322 | 526,491 | 73,094,893 | 2,671,274 | ~$122.28 |
+| 4B Small fixes | Sonnet 5.5 | | | | | | | |
+| 4A Visual bugs | Fable 5.2 | | | | | | | |
 | 5 README, deploy, launch | | | | | | | | |
 | **Total** | | | | | | | | |
 
@@ -168,3 +169,11 @@ The owner looked at the screenshots from the lighting pass: day better, evening 
 - Mid-distance window blocks were uniform, which read as tiles. They now vary in brightness.
 
 **Not done:** real architectural lighting on towers (edges, facades); moving traffic on ordinary streets; the mid-distance window blocks are still visible as blocks.
+
+### Version 0.1.0 accepted (2026-11-13)
+
+The owner accepted the state after the evening and night pass as version 0.1.0: "I will allow it for a 0.1.0 version". Not praise, a stopping point. Phase 3 took one build and four review passes, nine prompts and about $122 at API-equivalent prices, against roughly $20 for the first build alone. Most of that was spent finding out what "fake" meant: the first two passes answered a different question (lag, then missing detail) from the one that mattered (light and patterns).
+
+What carried over to Phase 4 is in PLAN.md §5, split in two chats: 4B small fixes for Sonnet 5.5 (perf overlay, URL parameters, touch, messages, housekeeping) and 4A visual bugs for Fable 5.2 (night from the air, tower lighting, roads in three dimensions, shadow seam, landmarks by day, tour framing, Low quality). Each has its prompt in the plan.
+
+Added for both: `npm run check` (`scripts/check.mjs`), the Node checks used all through Phase 3, now in the repo: landmark meshes, tile meshing on the real data, tour clearance.

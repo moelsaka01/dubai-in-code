@@ -3,7 +3,7 @@
 A browser 3D model of Dubai built only from OpenStreetMap data and code. No 3D software, no downloaded models, no AI asset generators.
 **A fresh chat should read this file and nothing else before starting a phase.** Then open only the files its task names.
 
-Rules for every phase: plan before coding, no screenshots unless asked, no trial-and-error loops, update `BUILD_LOG.md` and tick the boxes in §5 before the final commit.
+Rules for every phase: plan before coding, no screenshots unless asked (Phase 4A asks for them, see §5), no trial-and-error loops, update `BUILD_LOG.md` and tick the boxes in §5 before the final commit.
 
 ---
 
@@ -251,6 +251,7 @@ Done when `npm run data:fetch && npm run data:build` produces `public/data/` ins
 - [x] 2.12 `public/data/` built (no git repo exists yet, so nothing was committed), `BUILD_LOG.md` updated
 
 ### Phase 3 — rendering and landmarks (Fable 5.2) ✅
+**Accepted by the owner as version 0.1.0 on 2026-11-13** ("I will allow it for a 0.1.0 version"), after four rounds of review: the review pass, the detail pass, the lighting pass and the evening and night pass, all recorded below. What the owner still sees as weak is the task list of Phase 4.
 Done when the city loads, the slider works from noon to night, the five landmarks stand in place and the tour plays.
 - [x] 3.1 App shell: renderer, resize, render loop, quality state. Touches: `src/main.js`, `src/app.js`
 - [x] 3.2 `timeOfDay.js` + sky dome + shared GLSL chunk. Touches: `src/env/timeOfDay.js`, `src/world/sky.js`, `src/shaders/common.glsl.js`
@@ -313,15 +314,76 @@ What Phase 3 built differently from §3 and §4 (read before Phase 4):
 - Frame time along the tour at 1920x1080 on Intel Iris Xe: 13.3 to 19.4 ms (previous commit 12.3 to 16.8 ms, measured on another run; treat as "about the same"). The governor trims resolution in the heaviest views.
 - Limits: at mid distance lit windows are still blocks (6 bays by 2 floors). Crown lights follow tier tops, not real architectural lighting. Night in Low quality has no bloom.
 
-### Phase 4 — polish and performance
-- [ ] 4.1 Measure: draw calls, triangles, frame time at 5 fixed camera spots (`?perf` overlay). Fix the worst first
-- [ ] 4.2 Auto quality fallback, DPR cap, LOD distances tuned (the fallback exists as the resolution governor; LOD distances are still untuned)
-- [x] 4.3 Water shore mask (shallows, foam, night glow) — done in the Phase 3 review pass, from the city map's shore channel
-- [ ] 4.4 Night pass: window colour mix, beacons, horizon glow, bloom tuning, SZR light streaks
-- [ ] 4.5 Tour timing and framing; share URL params (`?t=`, `?cam=`, `?notour`); `H` hides the UI for recording
-- [ ] 4.6 Mobile/touch sanity, WebGL-unavailable message, loading screen
-- [ ] 4.7 Stretch: fountain, Metro viaduct (shadows are done, see the review pass above)
-- [ ] 4.8 Update `BUILD_LOG.md`
+### Phase 4 — polish, in two chats
+
+Phase 4 is split by the kind of work, because the two kinds need different models and different rules.
+Run them one after the other, never at the same time (both touch `src/app.js`). **4B first**: it is cheap, and its `?perf` overlay and URL parameters make 4A's work easier to measure and to look at.
+
+Where the old task numbers went: 4.1 is 4B.1; 4.2 is done as the resolution governor, the rest is 4B.6; 4.3 is done; 4.4 is 4A.1 and 4A.2; 4.5 is 4A.6, 4B.2 and 4B.3; 4.6 is 4B.4 and 4B.5; 4.7 is 4A.8.
+
+Both chats: `npm run check` (landmark meshes, tile meshing, tour clearance, no browser needed) and `npm run build` must pass before every commit. One commit per task. Commit on `master`, do not push.
+
+#### Phase 4A — visual bugs (Fable 5.2)
+
+These are judged by eye. **Screenshots are required in this chat**: nothing here can be verified by numbers, and the first version of Phase 3 was finished without anyone looking at it.
+
+How to look at it:
+- Start the dev server from `.claude/launch.json` (name `dubai-dev`, port 5173) in the preview pane. `window.__dubai` is the app: `env.setTime(t)`, `camera`, `controls`, `tour`, `landmarks.view(key)`, `frame(now)`, `stats()`, `res` (render scale), `setQuality('low' | 'high')`.
+- To hold a view: stop the tour, set `controls.enabled = false`, set the time and the camera, call `frame(performance.now())` about 30 times (the shadow map refreshes every fourth frame), then screenshot. Hide `#chips`, `#title`, `#panel` for a clean frame; never hide `#credit` in anything that ships.
+- Set the pane to 1280x720. On a 150% display the screenshot tool sometimes crops to the top-left two thirds; if a landmark that should be centred is not, shrink `#scene` to 66.667% width and height in the page before deciding it is a bug.
+- Always look at the same view at t = 0.3, 0.5, 0.64, 0.75 and 1.0. Every pass so far fixed one time of day and exposed another.
+
+How to measure: frame time at 1920x1080 on the owner's Intel Iris Xe is 13 to 19 ms along the tour, and readings drift by several ms as the laptop warms. The only comparison that holds is back to back: `git stash`, time the previous commit, `git stash pop`, time again (see BUILD_LOG.md, lighting pass). Budget: no slower than now, or the governor's scale (`__dubai.res.scale`) stays at 0.8 or above during the tour.
+
+What the owner has said, in order: it lagged; it looked like Lego; everything except the sea looked fake; the target is a film-like aerial shot of a clean architectural model; day is now better, the evening needed definition, night looked fake. Lessons that cost a pass each: patterns (random per-window values, painted bays) read as a printed texture, smooth light reads as real; more objects did not help, better light did; never evaluate noise per reflected pixel; never feed an unclamped varying to `exp()`.
+
+- [ ] 4A.1 Night from the air. At 1 to 4 km lit windows are blocks of 6 bays by 2 floors. Find something that reads as windows at that distance. `src/shaders/building.glsl.js`, the night block.
+- [ ] 4A.2 Tower lighting at night. The crown bands just follow tier tops. A few towers need facade or edge lighting; check all five landmarks at night (Burj Khalifa's pattern, Burj Al Arab's fabric, Cayan). `src/shaders/building.glsl.js`, `src/landmarks/*.js`.
+- [ ] 4A.3 Roads in three dimensions. A raised bridge that continues in the next tile ramps down at the tile edge. Motorways and the Metro are flat. Standing cars stay under raised decks, palms stand on bridge approaches. `buildRoads()` and `buildProps()` in `src/data/tileWorker.js`, `src/world/roads.js`, `src/world/traffic.js`.
+- [ ] 4A.4 Shadows. Sharp only inside the box around the camera, soft beyond it; look at the seam. Trees and bridge decks cast none. Check for striping on walls at low sun. `src/world/sunShadow.js`, `sunLight()` in `src/shaders/common.glsl.js`.
+- [ ] 4A.5 Landmarks by day. Burj Khalifa is plain from far away. The Museum of the Future's proportions and script. Cayan's twist does not read from its chip view. Dubai Mall is one flat slab beside Burj Khalifa.
+- [ ] 4A.6 Tour framing and timing (54 s). Look at every keyframe at the time of day the tour reaches it. `src/camera/tour.js`; `npm run check` guards clearance.
+- [ ] 4A.7 Low quality has no crisp shadows, contact shading, bloom or grade, so it looks like a different app. Decide what it keeps.
+- [ ] 4A.8 Stretch, only if the rest is done: Dubai Fountain on the Burj lake at night, Atlantis arch, Metro viaduct.
+- [ ] 4A.9 Update `BUILD_LOG.md` (what the screenshots showed, what changed, frame time back to back) and tick these boxes.
+
+Prompt for the chat (Fable 5.2):
+
+```
+Read PLAN.md, then do Phase 4A (visual bugs), tasks 4A.1 to 4A.7 in order, 4A.8 only if there is budget left, then 4A.9.
+
+This phase is judged by eye, so take screenshots: follow "How to look at it" in PLAN.md §5 and look at every change at t = 0.3, 0.5, 0.64, 0.75 and 1.0 before calling it done. Before you change anything, take the five-times set for one view from the air and one close to buildings, and tell me in a short list what you see wrong; then start.
+
+Measure frame time back to back the way PLAN.md describes, and do not make it slower. Run npm run check and npm run build before each commit, one commit per task, on master, no push.
+
+Do not touch the UI, the URL handling or index.html: those belong to Phase 4B. If a task turns out to need a decision from me (for example what Low quality should keep), ask once and carry on with the next task meanwhile.
+```
+
+#### Phase 4B — small fixes (Sonnet 5.5)
+
+Plain engineering with clear answers. The no-screenshots rule stands here: check with the console, the DOM and `npm run check`. Do not change how anything is lit, shaded or shaped: `src/shaders/`, `src/world/`, `src/landmarks/`, `src/data/buildingMesh.js` and `src/post.js` are off limits except to read.
+
+- [ ] 4B.1 `?perf` overlay: draw calls, triangles, frame time (smoothed), render scale and quality level, read from `window.__dubai.stats()` and `.res`. Then record those numbers at five fixed camera spots (tour seconds 0, 9, 27, 44, 54) in `BUILD_LOG.md`. Touches: `src/ui/`, `src/app.js`.
+- [ ] 4B.2 URL parameters: `?t=0..1` (time of day), `?cam=x,y,z,tx,ty,tz` (camera and target in scene metres), `?notour`, `?q=low|high`. A parameter that sets the view also skips the tour. Touches: `src/app.js`, a small `src/ui/params.js`.
+- [ ] 4B.3 `H` hides the overlay for recording. The OSM credit (`#credit`) stays visible in every state.
+- [ ] 4B.4 A clear message when WebGL 2 is not available, and when a data file fails to load (the status line already reports the count; make sure the page is not left blank). Loading: the bar exists; keep the tour from starting before the first frame with the city in it.
+- [ ] 4B.5 Phones and touch: start in Low on a coarse pointer or a narrow screen, check the panel and chips at 360 px wide, make sure one-finger orbit and pinch zoom work and that scrolling the page does not skip the tour. Respect `prefers-reduced-motion`: no automatic tour.
+- [ ] 4B.6 Put the LOD distances and the governor's constants in one commented block at the top of `src/app.js` (they are spread over `QUALITY`, `src/world/props.js` and `src/world/sunShadow.js`); do not change their values.
+- [ ] 4B.7 Housekeeping: commit `.claude/launch.json` or ignore `.claude/` (ask which); delete the empty `.gitkeep` files in folders that now have code; add "run it" and "check it" lines to `README.md`; add Sonnet 5.5 prices to `PRICES` in `scripts/usage.mjs` (look them up) and fill the Phase 2 cost in `BUILD_LOG.md`.
+- [ ] 4B.8 §3 and §4 of this file describe the first design. Do not rewrite them; add a one-line "superseded, see §5" note to each paragraph that the Phase 3 notes overrule (post-processing, shadows, water draw order, bloom strengths, tour length).
+- [ ] 4B.9 Update `BUILD_LOG.md` and tick these boxes.
+
+Prompt for the chat (Sonnet 5.5):
+
+```
+Read PLAN.md, then do Phase 4B (small fixes), tasks 4B.1 to 4B.9 in order.
+
+Keep to the files each task names. Do not change anything in src/shaders/, src/world/, src/landmarks/, src/data/buildingMesh.js or src/post.js: the look of the scene is Phase 4A's job, and a change there cannot be judged without screenshots, which this phase does not take.
+
+Check each task without screenshots: no console errors on load, the DOM and window.__dubai state are what the task says, npm run check and npm run build pass. One commit per task, on master, no push.
+
+Where a task says "ask", ask me once and carry on with the next task meanwhile. At the end, list anything you noticed that looks like a visual bug but did not touch, so it can go to Phase 4A.
+```
 
 ### Phase 5 — README, deploy, launch
 - [ ] 5.1 `README.md`: what it is, how it was built, how to reproduce the data, credits, ODbL notice

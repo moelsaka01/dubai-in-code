@@ -224,3 +224,11 @@ button[aria-pressed='true'] {
   white-space: pre;
   pointer-events: none;
 }
+
+/* H: recording mode. Hides the overlay; #credit is deliberately not listed (OSM attribution). */
+body.hud-hidden #title,
+body.hud-hidden #chips,
+body.hud-hidden #panel,
+body.hud-hidden #perf {
+  display: none;
+}

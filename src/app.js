@@ -179,7 +179,7 @@ export function createApp(canvas) {
 
   // Any input on the scene skips the tour.
   const takeOver = (e) => {
-    if (ui.isControl(e.target)) return;
+    if (ui.isControl(e.target) || ui.isHudKey(e)) return;
     stopTour();
     controls.cancelFlight();
   };

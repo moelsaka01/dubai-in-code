@@ -21,19 +21,50 @@ import { parseParams } from './ui/params.js';
 import { showFatal } from './ui/fatal.js';
 import { createPost } from './post.js';
 
-// lodFar: beyond it a tile draws only its >= 40 m buildings. minorFar: beyond it class >= 4 roads are hidden.
-// plantFar: within it a tile also draws its roof plant. props: trees, cars and boats.
+// ---- Tuning constants: LOD distances and the resolution governor ----
+// Everything that decides how far things draw and when the render scale changes, in one place.
+// Distances are metres from the camera. Values here are the live ones; the three groups marked "lives in"
+// are read by other modules and are listed so a tuning pass knows where to look.
+//
+// Per quality level (used by frame() below):
+//   lodFar    beyond it a tile draws only its >= 40 m buildings (the tallest-first draw range).
+//   minorFar  beyond it class >= 4 roads are hidden.
+//   plantFar  within it a tile also draws its roof plant (0 = never).
+//   props     trees, cars and boats on or off.
+//   dpr       device pixel ratio cap, before the governor's scale.
+//   bloom     post pipeline with bloom, SSAO, grade and crisp sun shadows (Low renders straight to the canvas).
 const QUALITY = {
   high: { dpr: 1.5, bloom: true, lodFar: 7000, minorFar: 5000, plantFar: 2200, props: true },
   low: { dpr: 1, bloom: false, lodFar: 4500, minorFar: 3000, plantFar: 0, props: false },
 };
 const FOV = 50;
-// Resolution scaling: when frames run long the render size shrinks (the canvas is stretched back up), and it
-// creeps up again once there is headroom. This is what keeps the tour smooth on an integrated GPU.
+// Lives in src/world/props.js (FAR, metres from the edge of a 2 km cell): palms 1900, trees 1900, cars 1000, boats 6000.
+// Lives in src/world/sunShadow.js: shadow map 2048 px; half-width of the box 700..2600 m (0.9 x reach + 300);
+//   reach capped at 2800 m (1500 m when looking level); towers-only draw beyond 1400 m, no roof plant.
+//   Those two files are not touched in Phase 4B, so their numbers are described here, not imported.
+//
+// Resolution governor. When frames run long the render size shrinks (the canvas is stretched back up), and
+// it creeps up again once there is headroom. This is what keeps the tour smooth on an integrated GPU.
 // Every reduction is a trial: if the frame time does not improve, the cause is not the GPU's fill rate (a
 // throttled tab, a 30 fps cap, a busy CPU), so the reduction is undone and not tried again for a while.
-const MIN_SCALE = 0.5;
-const SLOW_MS = 20.5, FAST_MS = 17.6, WINDOW_MS = 750;
+const GOVERNOR = {
+  minScale: 0.5,       // never render below half size
+  slowMs: 20.5,        // average frame time above this -> try a smaller scale
+  fastMs: 17.6,        // average below this for climbAfterMs -> try a larger scale
+  windowMs: 750,       // frames are averaged over this long before a decision
+  hitchMs: 250,        // a single frame longer than this (tab switch, tile upload) is ignored
+  settleMs: 300,       // after a resize, let it settle before judging
+  stepDown: 0.82,      // scale multiplier per reduction
+  stepUp: 1.12,        // scale multiplier per climb
+  trialGain: 0.88,     // a reduction must bring the average below this fraction, or it is undone
+  climbAfterMs: 4500,  // time under fastMs before climbing
+  climbHoldMs: 3000,   // wait after a climb before the next
+  climbWaitMs: 6000,   // initial wait after a reduction before climbing; grows by climbWaitGrow up to climbWaitMax
+  climbWaitGrow: 1.6,
+  climbWaitMax: 120000,
+  lockMs: 30000,       // after an undone trial, no reductions for this long; doubles up to lockMax
+  lockMax: 600000,
+};
 
 export function createApp(canvas) {
   const params = parseParams();
@@ -59,7 +90,7 @@ export function createApp(canvas) {
 
   // ---- quality + resize ----
   let level = 'high';
-  const res = { enabled: true, scale: 1, sum: 0, n: 0, skip: 0, fast: 0, hold: 0, climbWait: 6000, lock: 0, lockWait: 30000, trial: null };
+  const res = { enabled: true, scale: 1, sum: 0, n: 0, skip: 0, fast: 0, hold: 0, climbWait: GOVERNOR.climbWaitMs, lock: 0, lockWait: GOVERNOR.lockMs, trial: null };
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, QUALITY[level].dpr) * res.scale;
@@ -78,37 +109,37 @@ export function createApp(canvas) {
   }
   /** Feed one frame time (ms) to the resolution governor. */
   function govern(ms) {
-    if (!res.enabled || ms > 250) return; // a hitch (tab switch, tile upload) is not a slow frame
+    if (!res.enabled || ms > GOVERNOR.hitchMs) return; // a hitch (tab switch, tile upload) is not a slow frame
     res.hold -= ms;
     res.lock -= ms;
     if (res.skip > 0) { res.skip -= ms; return; } // let a resize settle before judging it
     res.sum += ms;
     res.n++;
-    if (res.sum < WINDOW_MS) return;
+    if (res.sum < GOVERNOR.windowMs) return;
     const avg = res.sum / res.n;
     res.sum = res.n = 0;
-    const set = (scale) => { res.scale = scale; res.skip = 300; resize(); };
+    const set = (scale) => { res.scale = scale; res.skip = GOVERNOR.settleMs; resize(); };
     if (res.trial) {
-      const helped = avg < res.trial.before * 0.88;
+      const helped = avg < res.trial.before * GOVERNOR.trialGain;
       if (!helped) {
         res.lock = res.lockWait;
-        res.lockWait = Math.min(600000, res.lockWait * 2);
+        res.lockWait = Math.min(GOVERNOR.lockMax, res.lockWait * 2);
         set(res.trial.from);
       }
       res.trial = null;
       return;
     }
-    res.fast = avg < FAST_MS ? res.fast + WINDOW_MS : 0;
-    if (avg > SLOW_MS && res.scale > MIN_SCALE && res.lock <= 0) {
+    res.fast = avg < GOVERNOR.fastMs ? res.fast + GOVERNOR.windowMs : 0;
+    if (avg > GOVERNOR.slowMs && res.scale > GOVERNOR.minScale && res.lock <= 0) {
       res.trial = { before: avg, from: res.scale };
       res.fast = 0;
       res.hold = res.climbWait;
-      res.climbWait = Math.min(120000, res.climbWait * 1.6); // each retreat waits longer before climbing again
-      set(Math.max(MIN_SCALE, res.scale * 0.82));
-    } else if (res.fast >= 4500 && res.hold <= 0 && res.scale < 1) {
+      res.climbWait = Math.min(GOVERNOR.climbWaitMax, res.climbWait * GOVERNOR.climbWaitGrow); // each retreat waits longer before climbing again
+      set(Math.max(GOVERNOR.minScale, res.scale * GOVERNOR.stepDown));
+    } else if (res.fast >= GOVERNOR.climbAfterMs && res.hold <= 0 && res.scale < 1) {
       res.fast = 0;
-      res.hold = 3000;
-      set(Math.min(1, res.scale * 1.12));
+      res.hold = GOVERNOR.climbHoldMs;
+      set(Math.min(1, res.scale * GOVERNOR.stepUp));
     }
   }
 

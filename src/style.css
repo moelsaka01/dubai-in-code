@@ -210,3 +210,17 @@ button[aria-pressed='true'] {
     border-radius: 18px;
   }
 }
+
+/* ?perf overlay */
+#perf {
+  position: fixed;
+  left: 16px;
+  bottom: 18px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 60%);
+  color: var(--ink);
+  font: 12px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  white-space: pre;
+  pointer-events: none;
+}

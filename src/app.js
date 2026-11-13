@@ -16,6 +16,7 @@ import { openCity } from './data/loader.js';
 import { createControls } from './camera/controls.js';
 import { createTour } from './camera/tour.js';
 import { createUI } from './ui/ui.js';
+import { createPerf } from './ui/perf.js';
 import { createPost } from './post.js';
 
 // lodFar: beyond it a tile draws only its >= 40 m buildings. minorFar: beyond it class >= 4 roads are hidden.
@@ -157,6 +158,9 @@ export function createApp(canvas) {
     },
   });
   ui.setTime(env.t);
+  const perf = new URLSearchParams(location.search).has('perf')
+    ? createPerf(() => app.stats(), () => res, () => level)
+    : null;
 
   // Any input on the scene skips the tour.
   const takeOver = (e) => {
@@ -174,6 +178,7 @@ export function createApp(canvas) {
   let last = performance.now();
   let loaded = false;
   function frame(now) {
+    const last0 = last;
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     if (loaded && now > last) govern(now - last);
     last = now;
@@ -195,6 +200,7 @@ export function createApp(canvas) {
     cityMap.update();
     clouds.update();
     post.render(env, q.bloom, dt);
+    if (perf) perf.tick(now - last0, now);
   }
   renderer.setAnimationLoop(frame);
 
@@ -237,7 +243,7 @@ export function createApp(canvas) {
     throw err;
   });
 
-  return {
+  const app = {
     renderer, scene, camera, env, controls, tour, buildings, roads, props, ready, frame, cityMap, sunShadow, res, post,
     get landmarks() { return landmarks; },
     setQuality,
@@ -249,4 +255,5 @@ export function createApp(canvas) {
         tiles: buildings.tileCount, streetLights: roads.lights.count, beacons: buildings.beacons.count, cars: traffic ? traffic.count : 0 };
     },
   };
+  return app;
 }

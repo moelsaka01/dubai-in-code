@@ -177,3 +177,21 @@ The owner accepted the state after the evening and night pass as version 0.1.0: 
 What carried over to Phase 4 is in PLAN.md §5, split in two chats: 4B small fixes for Sonnet 5.5 (perf overlay, URL parameters, touch, messages, housekeeping) and 4A visual bugs for Fable 5.2 (night from the air, tower lighting, roads in three dimensions, shadow seam, landmarks by day, tour framing, Low quality). Each has its prompt in the plan.
 
 Added for both: `npm run check` (`scripts/check.mjs`), the Node checks used all through Phase 3, now in the repo: landmark meshes, tile meshing on the real data, tour clearance.
+
+## Phase 4B — small fixes (Sonnet 5.5)
+
+### 4B.1 `?perf` overlay
+
+`?perf` shows a corner readout: smoothed frame time and fps, draw calls, triangles (thousands), render scale and quality level. Source: `src/ui/perf.js`, fed from `app.stats()` and `app.res` once per frame.
+
+Reference numbers at the five fixed tour spots (tour seconds 0, 9, 27, 44, 54), High quality, pose and time of day taken from `tourPose()` / `tourTime()`. Measured in the preview pane (1024x768 at DPR 1.5, 86 tiles loaded) with forced frames and `gl.finish()`, 30 warm-up frames and 30 timed. The pane was hidden, so `requestAnimationFrame` did not run and times are indicative only (they are far from the 1920x1080 Iris Xe tour readings of the earlier passes). Draw calls and triangle counts are exact for those views.
+
+| Tour s | t | Draw calls | Triangles | Frame ms (indicative) | Scale |
+|---|---|---|---|---|---|
+| 0 | 0.50 | 210 | 623 K | 8.2 | 1.00 |
+| 9 | 0.53 | 227 | 978 K | 36.7 | 1.00 |
+| 27 | 0.79 | 180 | 876 K | 59.9 | 1.00 |
+| 44 | 0.99 | 90 | 885 K | 25.6 | 1.00 |
+| 54 | 1.00 | 193 | 1 029 K | 87.9 | 1.00 |
+
+Re-measure on the owner's laptop with `?perf` before comparing anything in Phase 4A.

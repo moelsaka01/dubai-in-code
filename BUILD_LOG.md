@@ -150,6 +150,7 @@ Third verdict: still fake. This time the question went back to the owner in thre
 - The causes, in order: cloud noise evaluated in every reflected pixel (moved to a texture), contact shading at half size (now quarter size), and the shadow pass at about 7 ms per refresh (now every fourth frame, towers only beyond 1.4 km, no trees).
 - A ternary in GLSL does not skip the unused side on this GPU: "glass ? clouds : plain" still paid for the clouds everywhere.
 - Contact shading turned to blotches on the far sea, where depth is coarse. Faded out past 5 km.
+- A WebGL error went unnoticed until a final check: while the city loaded, the shadow sampler was bound to a texture that was not yet a depth texture, and the browser rejected every draw for about 60 frames. The earlier checks only read the error flag after loading. Fixed by allocating the shadow map when it is created; load, High and Low now run with no GL errors.
 - Stashing files under a running dev server produced one HTTP 500 for a missing module. Harmless, but it stays in the browser console and looked like a new error twice.
 
 **Not done:** trees and bridges cast no crisp shadows; street cars under raised decks; Low quality is unchanged.

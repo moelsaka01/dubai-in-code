@@ -16,6 +16,11 @@ export function createSunShadow(renderer, env) {
   depthTexture.magFilter = THREE.LinearFilter;
   const target = new THREE.WebGLRenderTarget(SIZE, SIZE, { depthTexture });
   env.uniforms.uSunMap.value = depthTexture;
+  // Allocate it now. Until a depth texture exists the shadow sampler is bound to a plain texture, and the
+  // browser rejects every draw that uses it (INVALID_OPERATION on each frame while the city loads).
+  renderer.setRenderTarget(target);
+  renderer.clear();
+  renderer.setRenderTarget(null);
 
   const light = new THREE.OrthographicCamera(-1, 1, 1, -1, 10, BACK * 2);
   const depthMaterial = new THREE.ShaderMaterial({

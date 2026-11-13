@@ -228,7 +228,8 @@ export function strut(from, to, r0, r1, sides = 8) {
 
 /**
  * Landmark surface material. `body` is GLSL that may set: albedo, emissive, gloss (0..1 mirror reflection),
- * metal (0..1: reflects at every angle, not only at grazing ones).
+ * metal (0..1: reflects at every angle, not only at grazing ones), skyward (0..1: the mirror shows the sky this
+ * wall faces instead of the ground below the viewer; for tall glass seen from the air, as on the city's towers).
  * It can read n (world normal), V (to camera), vLocal (object-space position), vUv, vWorldPos.
  */
 export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = THREE.FrontSide }) {
@@ -274,6 +275,7 @@ export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = T
         vec3 emissive = vec3(0.0);
         float gloss = 0.0;
         float metal = 0.0;
+        float skyward = 0.0;
         ${body}
         // Sun shadow and occlusion from the city maps, sampled a little outside the surface.
         vec3 outside = vWorldPos + n * 9.0;
@@ -282,7 +284,7 @@ export function landmarkMaterial(env, { body, decl = '', uniforms = {}, side = T
         vec3 col = shade(albedo, n, lit, ao);
         vec3 R = reflect(-V, n);
         float fres = pow(1.0 - max(dot(n, V), 0.0), 5.0);
-        vec3 mirror = envColor(R) * mix(0.7, 1.0, ao);
+        vec3 mirror = envColor(normalize(mix(R, vec3(R.x, abs(R.y) * 0.5 + 0.08, R.z), skyward))) * mix(0.7, 1.0, ao);
         col = mix(col, mirror, gloss * mix(0.25 + 0.75 * fres, 0.75 + 0.25 * fres, metal));
         col += uLightColor * (pow(max(dot(R, uLightDir), 0.0), 80.0) * gloss * 0.8 * lit);
         col = applyFog(col + emissive, vWorldPos);

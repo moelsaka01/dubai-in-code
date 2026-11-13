@@ -18,7 +18,7 @@ const SEGMENTS = [1, 2, 1, 3, 1, 2, 1, 3];
 
 export function create(env) {
   // One section: every side lists its own end points, so corners are doubled and stay sharp.
-  const section = [], us = [], skip = new Set();
+  const section = [], us = [], skip = new Set(), chamfers = [];
   let u = 0;
   for (let k = 0; k < 8; k++) {
     const a = CORNERS[k], b = CORNERS[(k + 1) % 8], segs = SEGMENTS[k];
@@ -27,6 +27,7 @@ export function create(env) {
       section.push([a[0] + ((b[0] - a[0]) * s) / segs, a[1] + ((b[1] - a[1]) * s) / segs]);
       us.push(u + (len * s) / segs);
     }
+    if (segs === 1) chamfers.push([u, u + len]);
     u += len;
     if (k < 7) skip.add(section.length - 1); // no quad between this side's last point and the next side's first
   }
@@ -53,9 +54,14 @@ export function create(env) {
         float detail = 1.0 - smoothstep(0.3, 0.8, max(fw.x, fw.y));
         float column = smoothstep(0.36, 0.44, abs(fract(g.x) - 0.5));
         float slab = smoothstep(0.34, 0.44, abs(fract(g.y) - 0.5));
-        float frame = mix(0.4, max(column, slab), detail);
-        albedo = mix(vec3(0.07, 0.10, 0.13), vec3(0.70, 0.71, 0.70), frame);
+        // The twist reads through lines that lean: the columns run up the helix, so they are drawn stronger than
+        // the level slab edges, and the eight corners carry a dark recess from foot to crown.
+        float frame = mix(0.36, max(column, slab * 0.55), detail);
+        float corner = ${chamfers.map(([a, b]) => `step(${a.toFixed(2)}, vUv.x) * step(vUv.x, ${b.toFixed(2)})`).join(' + ')};
+        frame *= 1.0 - corner;
+        albedo = mix(vec3(0.07, 0.10, 0.13), vec3(0.74, 0.75, 0.74), frame) * (1.0 - 0.55 * corner);
         gloss = mix(0.85, 0.15, frame);
+        skyward = 1.0;
         // Night: flats lit in short runs, most of them dim, and a soft cool light on the columns and slab edges
         // so the helix still reads after dark. (A hash per window made a white checkerboard.)
         vec2 cell = floor(g);

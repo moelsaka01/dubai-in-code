@@ -78,9 +78,15 @@ export function create(env) {
         vec3 glass = vec3(0.09, 0.14, 0.19);
         vec3 steel = vec3(0.60, 0.63, 0.66);
         float spire = smoothstep(700.0, 735.0, y);
-        albedo = mix(mix(glass, steel, frame), steel, spire);
-        gloss = mix(mix(0.9, 0.35, frame), 0.5, spire);
+        // The tiers are what make the tower readable from far away: each one ends in a dark mechanical band
+        // under its terrace and starts a little brighter above it.
+        float tier = ${(SETBACKS - 1).toFixed(1)} * pow(clamp((y - 46.0) / ${(WING_TOP - 46).toFixed(1)}, 0.0, 1.0), ${(1 / 0.92).toFixed(4)});
+        float up = fract(tier);
+        float tierShade = (1.0 - 0.45 * smoothstep(0.86, 0.92, up)) * (0.9 + 0.2 * exp(-up * 5.0)) * step(46.0, y) + (1.0 - step(46.0, y));
+        albedo = mix(mix(glass, steel, frame) * tierShade, steel, spire);
+        gloss = mix(mix(0.9, 0.35, frame) * mix(0.55, 1.0, tierShade), 0.5, spire);
         metal = 0.5 * (1.0 - frame); // coated glass: it mirrors the sky at every angle, which is what makes the tower silver-blue
+        skyward = 1.0 - spire;       // and from the air it must mirror sky, not sand
 
         vec2 cell = floor(g);
         float share = uLitFraction * 0.3;
@@ -90,8 +96,6 @@ export function create(env) {
         // After dark the tower is lit the way it is built. Every setback terrace throws light up the tier above
         // it, so each tier is bright at its foot and fades toward the next terrace; the steel fins catch that
         // light; the top third is brighter than the foot; a slow pulse climbs the shaft; and the spire is white.
-        float tier = ${(SETBACKS - 1).toFixed(1)} * pow(clamp((y - 46.0) / ${(WING_TOP - 46).toFixed(1)}, 0.0, 1.0), ${(1 / 0.92).toFixed(4)});
-        float up = fract(tier);
         float wash = exp(-up * 3.2) + 0.35 * smoothstep(0.90, 1.0, up);
         float rise = 0.45 + 0.55 * smoothstep(0.0, 620.0, y);
         float pulse = 0.82 + 0.18 * sin(y / 55.0 - uTime * 0.7);

@@ -183,7 +183,8 @@ function pitch(b, ring) {
 }
 
 /** Chillers, tanks and stair heads: a few boxes at random spots on a flat roof, aligned with its longest wall. */
-function plant(ring, hole, y, seed, out) {
+function plant(ring, holes, y, seed, out) {
+  const inHole = (x, yy) => { if (holes) for (const h of holes) if (inside(h, x, yy)) return true; return false; };
   const bb = bbox(ring);
   const [, , area] = centroid(ring);
   if (area < 180) return;
@@ -196,10 +197,14 @@ function plant(ring, hole, y, seed, out) {
   }
   const ca = Math.cos(ang), sa = Math.sin(ang);
   const rnd = rng(seed * 2654435761);
-  const want = Math.min(5, Math.max(1, Math.round(area / 320)));
+  // A mall or a hall is not one flat slab: past 5000 m2 the roof carries large low volumes (atrium roofs, plant
+  // halls, skylight ridges) instead of a handful of chillers.
+  const big = area > 5000;
+  const huge = area > 60000 ? 1.6 : 1; // the Dubai Mall is a quarter of a square kilometre
+  const want = big ? Math.min(44, Math.round(area / 1600)) : Math.min(5, Math.max(1, Math.round(area / 320)));
   for (let made = 0, tries = 0; made < want && tries < want * 8; tries++) {
     const x = bb[0] + rnd() * (bb[1] - bb[0]), yy = bb[2] + rnd() * (bb[3] - bb[2]);
-    const hw = 1 + rnd() * 2, hd = 1 + rnd() * 1.6;
+    const hw = big ? (5 + rnd() * 17) * huge : 1 + rnd() * 2, hd = big ? (4 + rnd() * 9) * huge : 1 + rnd() * 1.6;
     const box = new Float32Array(8);
     let ok = true;
     for (let k = 0; k < 4 && ok; k++) {
@@ -209,10 +214,10 @@ function plant(ring, hole, y, seed, out) {
       box[2 * k + 1] = py;
       // Stay a metre clear of the roof edge, and off the shaft that stands on a podium.
       const mx = x + (px - x) * 1.5, my = yy + (py - yy) * 1.5;
-      ok = inside(ring, mx, my) && !(hole && inside(hole, mx, my));
+      ok = inside(ring, mx, my) && !inHole(mx, my);
     }
-    if (!ok || (hole && inside(hole, x, yy))) continue;
-    out.push({ rings: [box], y0: y, y1: y + 1.2 + rnd() * 2.4, color: PLANT[Math.floor(rnd() * PLANT.length)], seed: Math.floor(rnd() * 255) });
+    if (!ok || inHole(x, yy)) continue;
+    out.push({ rings: [box], y0: y, y1: y + (big ? 2.5 + rnd() * 5 : 1.2 + rnd() * 2.4), color: PLANT[Math.floor(rnd() * PLANT.length)], seed: Math.floor(rnd() * 255) });
     made++;
   }
 }
@@ -276,9 +281,11 @@ export function buildBuildings(list, nTall, e0, n0, h) {
     if (simple && !shaft && !extras.length) main.rise = pitch(b, outer);
     // Roof plant on the focus districts only: on the podium around the shaft, and on plain flat roofs.
     if (simple && !b.tierB && b.kind !== 3 && b.kind !== 7 && b.height >= 6) {
-      if (shaft) plant(outer, shaft.rings[0], main.y1, b.seed * 131 + i, details);
+      if (shaft) plant(outer, [shaft.rings[0]], main.y1, b.seed * 131 + i, details);
       if (!extras.length && !main.rise) plant(top.rings[0], null, top.y1, b.seed * 137 + i + 7, details);
     }
+    // Large buildings with courtyards (the malls): the same roof volumes, kept out of the courtyards.
+    if (!simple && !b.tierB && b.kind !== 7 && b.height >= 6 && y0 < 0.5) plant(outer, rings.slice(1), main.y1, b.seed * 139 + i + 3, details);
     prisms.forEach(count);
     prep[i] = { b, prisms };
   }

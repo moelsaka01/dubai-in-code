@@ -105,6 +105,7 @@ export function create(env) {
         float frame = mix(0.4, max(band, post * 0.7), detail);
         albedo = mix(vec3(0.07, 0.16, 0.26), vec3(0.88, 0.89, 0.90), frame);
         gloss = mix(0.85, 0.1, frame);
+        skyward = 1.0;
         // Suites are two floors high and several bays wide, so light comes in runs here too.
         vec2 cell = floor(g);
         float share = uLitFraction * 0.6;

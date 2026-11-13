@@ -163,7 +163,9 @@ void main() {
     // as glass is the sky in the direction the wall faces: bright toward a low sun, cool and dim away from it.
     vec3 Rs = normalize(vec3(R.x, abs(R.y) * 0.5 + 0.08, R.z));
     vec3 mirror = (glass > 0.5 ? envColor(Rs) : envPlain(Rs)) * mix(0.75, 1.0, ao) * mix(0.62, 1.0, smoothstep(0.0, 90.0, y)); // low floors mirror the street, not the sky
-    vec3 tint = mix(vec3(1.0), vColor * 3.0, glass * 0.55);
+    // Not every tower is the same glass: some are almost clear mirrors, some are strongly tinted and darker.
+    float tinted = hash11(vSeed * 6.1 + 4.0);
+    vec3 tint = mix(vec3(1.0), vColor * 3.0, glass * mix(0.35, 0.85, tinted));
     // A room behind every window (interior mapping): cast the view ray into a box one bay wide, one floor high
     // and five metres deep, and shade whichever surface it hits. Windows get depth and parallax for a few
     // lines of arithmetic, with no geometry.
@@ -188,7 +190,7 @@ void main() {
     vec3 roomTint = mix(vec3(0.72, 0.68, 0.60), vec3(0.58, 0.62, 0.68), h2);
     vec3 interior = roomTint * room * mix(0.16, 0.34, curtain);
     interior = mix(interior, interior * 0.2 + vColor * 0.2, glass); // tinted glass has a body colour of its own and hides the rooms by day
-    float reflectance = mix(0.5, 0.9, glass) * (0.5 + 0.5 * fres);
+    float reflectance = mix(0.5, mix(0.95, 0.66, tinted), glass) * (0.5 + 0.5 * fres);
     vec3 glassCol = shade(interior, n, lit, ao) * (1.0 - 0.4 * under) + mirror * tint * reflectance;
     glassCol += uLightColor * (pow(max(dot(R, uLightDir), 0.0), 64.0) * lit * mix(0.5, 1.3, glass));
     // Reveal: the glass sits back from the wall face, so the head of a punched window is in shade.

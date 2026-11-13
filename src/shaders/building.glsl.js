@@ -216,17 +216,19 @@ void main() {
     float litMid = mix(mean, mix(runA, runB, spill), floors) * 0.64; // 0.64: the mean of the bays inside a run
     float litRooms = mix(litMid, litNear, detail);
     float hc = mix(0.5, mix(hcA, hcB, spill), floors);
-    vec3 home = mix(vec3(1.0, 0.56, 0.24), vec3(1.0, 0.80, 0.54), hc);
-    vec3 office = mix(vec3(1.0, 0.80, 0.54), vec3(0.84, 0.92, 1.0), smoothstep(0.72, 0.95, hc));
+    vec3 home = mix(vec3(1.0, 0.48, 0.17), vec3(1.0, 0.74, 0.42), hc);
+    vec3 office = mix(vec3(1.0, 0.64, 0.32), vec3(0.66, 0.84, 1.0), smoothstep(0.5, 0.9, hc));
     vec3 lamp = mix(home, office, glass);
     float nightAmt = pow(uNight, 0.7);
     // Kept below the level where the tone curve bleaches colour: lamp light should stay amber, not go white.
-    col += lamp * (min(litRooms * mix(1.0, room * 1.9, detail), 1.0) * win * typical * nightAmt * mix(1.15, 0.95, glass));
+    col += lamp * (min(litRooms * mix(1.0, room * 1.9, detail), 1.0) * win * typical * nightAmt * mix(0.8, 0.6, glass));
     float shopLit = step(0.3, hash11(cell.x * 3.1 + vSeed)) * shop;
     col += vec3(1.0, 0.74, 0.46) * (shopLit * nightAmt * 0.9);
     // The city lights its own walls: a strong sodium wash on the first floors and a faint one far up, so towers
     // read as shapes and not as holes in the sky.
     col += wallAlbedo * vec3(1.0, 0.62, 0.34) * (uNight * (0.22 * exp(-y / 10.0) + 0.09 * exp(-y / 110.0)) * (0.35 + 0.65 * info.a));
+    // And the glow of the sky over the city on the whole facade: without it a dark tower is a hole with lights on.
+    col += vColor * vec3(0.55, 0.62, 0.85) * (uNight * 0.055);
     // Crown and setback lighting: a band of light at the top of each tier of a tall tower, in white, amber or blue.
     float accent = step(110.0, top) * step(0.62, hash11(vSeed * 4.7 + 1.0)) * step(top - 1.5, y) * (1.0 - step(top - 0.3, y));
     float pick = hash11(vSeed * 9.3 + 2.0);

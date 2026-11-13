@@ -8,17 +8,18 @@ const P = (e, n, h) => new THREE.Vector3(e, h, -n);
 
 // `at` is seconds from the start.
 export const TOUR_KEYS = [
-  { at: 0, pos: P(-9700, -6250, 110), look: P(-7432, -7195, 125) }, // offshore of Bluewaters: Ain Dubai, JBR behind
+  { at: 0, pos: P(-8700, -6650, 85), look: P(-7432, -7195, 125) }, // offshore of Bluewaters, close enough that Ain Dubai fills a third of the frame
   { at: 5, pos: P(-8350, -8150, 290), look: P(-6600, -7400, 110) }, // swing round the island toward the Marina
   { at: 9, pos: P(-6750, -7800, 390), look: P(-5276, -6442, 190) }, // up the Marina toward Cayan Tower
   { at: 13, pos: P(-5800, -6450, 410), look: P(-5700, -4700, 40) }, // past Cayan, turning to the Palm
   { at: 17, pos: P(-5250, -4750, 560), look: P(-7300, -2300, 0) }, // climb over the trunk toward Atlantis
-  { at: 21, pos: P(-5700, -2650, 620), look: P(-1280, -367, 150) }, // off the crown, turn down the coast
-  { at: 27, pos: P(-2350, 280, 190), look: P(-1250, -380, 160) }, // past Burj Al Arab on the sea side
+  { at: 21, pos: P(-4900, -2000, 430), look: P(-1280, -367, 150) }, // off the trunk, turn down the coast
+  { at: 24, pos: P(-3350, -350, 230), look: P(-1280, -367, 160) }, // low along the shore: the sea is empty, so do not linger over it
+  { at: 27, pos: P(-1930, 90, 125), look: P(-1250, -380, 150) }, // close past Burj Al Arab on the sea side
   { at: 30, pos: P(-350, -1450, 320), look: P(2388, -48, 60) }, // inland to Sheikh Zayed Road
   { at: 35, pos: P(2950, 750, 340), look: P(7729, 5781, 350) }, // along SZR, Burj Khalifa ahead
   { at: 40, pos: P(6250, 4250, 290), look: P(7729, 5781, 380) }, // into Downtown
-  { at: 44, pos: P(7950, 4950, 220), look: P(7729, 5781, 330) }, // low over the fountain lake
+  { at: 44, pos: P(8060, 4830, 200), look: P(7729, 5781, 410) }, // low over the fountain lake, far enough back to keep the spire in frame
   { at: 49, pos: P(8800, 5500, 430), look: P(7729, 5781, 400) }, // rising orbit
   { at: 54, pos: P(8550, 6750, 640), look: P(7729, 5781, 420) }, // ends high, the tower against the night skyline
 ];

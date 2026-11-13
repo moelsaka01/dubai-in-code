@@ -11,7 +11,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 // $ per million tokens: [input, output]. Add other models before the final cost table (PLAN.md task 5.3).
-const PRICES = { 'claude-fable-5-2': [8, 40] };
+// Sonnet 5.5: $2 / $10 per Anthropic's list price as reported by third-party trackers on 2026-11-13 (not read from Anthropic's own page; re-check in Phase 5).
+const PRICES = { 'claude-fable-5-2': [8, 40], 'claude-sonnet-5-5': [2, 10] };
 // Assumed cache multipliers on the input price. Check current pricing before publishing a number.
 const CACHE_READ = 0.1;
 const CACHE_WRITE_5M = 1.25;

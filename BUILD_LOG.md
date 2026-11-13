@@ -24,7 +24,7 @@ API-equivalent cost = input × P_in + output × P_out + cache read × 0.1 × P_i
 | Model | Input $/M | Output $/M | Source |
 |---|---|---|---|
 | Claude Fable 5.2 | 8 | 40 | given in the project brief |
-| Claude Sonnet 5.5 | to fill | to fill | look up at Phase 5 and add to `PRICES` in `scripts/usage.mjs` |
+| Claude Sonnet 5.5 | 2 | 10 | third-party price trackers, 2026-11-13 (Anthropic's own page could not be opened); cache read $0.20, 5-minute write $2.50, 1-hour write $4 per M are in line with the script's multipliers. Re-check in Phase 5 |
 
 The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them against current pricing in Phase 5 before publishing a number. Most of the token volume is cache reads, so they matter.
 
@@ -33,7 +33,7 @@ The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them again
 | Phase | Model | Prompts | Time | Input | Output | Cache read | Cache write | API-equivalent |
 |---|---|---|---|---|---|---|---|---|
 | 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
-| 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | price not set (Phase 5) |
+| 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | $3.60 |
 | 3 Rendering and landmarks, with four review passes (v0.1.0) | Fable 5.2 | 9 | ~19 h wall clock | 322 | 526,491 | 73,094,893 | 2,671,274 | ~$122.28 |
 | 4B Small fixes | Sonnet 5.5 | | | | | | | |
 | 4A Visual bugs | Fable 5.2 | | | | | | | |

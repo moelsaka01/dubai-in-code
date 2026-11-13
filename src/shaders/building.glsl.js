@@ -44,17 +44,21 @@ float kindIs(float k) {
   return 1.0 - step(0.5, abs(vKind - k));
 }
 
-// Lit rooms on one floor come in runs of bays. Returns 1 where bay cx of floor cy is in a lit run, and the run's
-// lamp tone in [0, 1]. Where a run is narrower than a pixel (fwx bays) it returns the floor's mean instead.
+// Lit rooms on one floor come in runs of bays: a flat is one to three bays, an office floor plate three to ten.
+// Returns the brightness of the run that bay cx of floor cy belongs to (0 when it is dark) and the run's lamp
+// tone in [0, 1]. Most runs are dim and a few are bright, as in any photograph of a city at night. Where a run
+// is narrower than a pixel (fwx bays) the floor's mean comes back instead.
 float litRun(float cx, float cy, float glass, float chance, float fwx, out float tone) {
-  float runLen = mix(2.0 + floor(hash11(cy * 7.1 + vSeed * 3.3) * 3.0), 6.0 + floor(hash11(cy * 5.3 + vSeed * 1.7) * 9.0), glass);
+  float runLen = mix(1.0 + floor(hash11(cy * 7.1 + vSeed * 3.3) * 3.0), 3.0 + floor(hash11(cy * 5.3 + vSeed * 1.7) * 8.0), glass);
   float run = floor((cx + floor(hash11(cy * 3.7 + vSeed) * runLen)) / runLen);
   float hr = hash21(vec2(run, cy) + vSeed * 7.13);
-  float inUse = mix(1.0, step(hash11(cy * 9.1 + vSeed * 2.9), 0.4) * 2.2, glass); // most office floors are empty at night
+  float ht = hash21(vec2(run, cy) * 1.9 + vSeed * 2.3);
+  float inUse = mix(1.0, step(hash11(cy * 9.1 + vSeed * 2.9), 0.5) * 1.5, glass); // half the office floors are empty at night
   float p = min(chance * inUse, 1.0);
   float sharp = 1.0 - smoothstep(0.35, 1.0, fwx / runLen);
-  tone = mix(0.5, hash21(vec2(run, cy) * 1.9 + vSeed * 2.3), sharp);
-  return mix(p, step(hr, p), sharp);
+  tone = mix(0.5, ht, sharp);
+  float hb = fract(ht * 17.3);
+  return mix(p * 0.45, step(hr, p) * (0.18 + 0.82 * hb * hb), sharp);
 }
 
 void main() {
@@ -203,13 +207,13 @@ void main() {
     float chance = clamp(uLitFraction * (0.2 + 0.6 * seedA), 0.0, 0.9);
     float hcA, hcB;
     float runA = litRun(cell.x, cell.y, glass, chance, fw.x, hcA);
-    float litNear = runA * step(0.16, h1) * (0.4 + 0.8 * h3);
+    float litNear = runA * step(0.25, h1) * (0.5 + 0.7 * h3);
     float side = f.y > 0.5 ? 1.0 : -1.0;
     float runB = litRun(cell.x, cell.y + side, glass, chance, fw.x, hcB);
     float spill = clamp((abs(f.y - 0.5) + 0.5 * fw.y - 0.5) / fw.y, 0.0, 0.5); // share of this pixel on the next floor
     float floors = 1.0 - smoothstep(0.9, 2.4, fw.y);
-    float mean = chance * mix(1.0, 0.88, glass);
-    float litMid = mix(mean, mix(runA, runB, spill), floors) * 0.67; // 0.67: the mean of the bays inside a run
+    float mean = chance * mix(1.0, 0.75, glass) * 0.45;
+    float litMid = mix(mean, mix(runA, runB, spill), floors) * 0.64; // 0.64: the mean of the bays inside a run
     float litRooms = mix(litMid, litNear, detail);
     float hc = mix(0.5, mix(hcA, hcB, spill), floors);
     vec3 home = mix(vec3(1.0, 0.56, 0.24), vec3(1.0, 0.80, 0.54), hc);
@@ -217,12 +221,12 @@ void main() {
     vec3 lamp = mix(home, office, glass);
     float nightAmt = pow(uNight, 0.7);
     // Kept below the level where the tone curve bleaches colour: lamp light should stay amber, not go white.
-    col += lamp * (min(litRooms * mix(1.0, room * 1.9, detail), 1.0) * win * typical * nightAmt * mix(0.55, 0.42, glass));
+    col += lamp * (min(litRooms * mix(1.0, room * 1.9, detail), 1.0) * win * typical * nightAmt * mix(1.15, 0.95, glass));
     float shopLit = step(0.3, hash11(cell.x * 3.1 + vSeed)) * shop;
     col += vec3(1.0, 0.74, 0.46) * (shopLit * nightAmt * 0.9);
     // The city lights its own walls: a strong sodium wash on the first floors and a faint one far up, so towers
     // read as shapes and not as holes in the sky.
-    col += wallAlbedo * vec3(1.0, 0.62, 0.34) * (uNight * (0.22 * exp(-y / 10.0) + 0.06 * exp(-y / 70.0)) * (0.35 + 0.65 * info.a));
+    col += wallAlbedo * vec3(1.0, 0.62, 0.34) * (uNight * (0.22 * exp(-y / 10.0) + 0.09 * exp(-y / 110.0)) * (0.35 + 0.65 * info.a));
     // Crown and setback lighting: a band of light at the top of each tier of a tall tower, in white, amber or blue.
     float accent = step(110.0, top) * step(0.62, hash11(vSeed * 4.7 + 1.0)) * step(top - 1.5, y) * (1.0 - step(top - 0.3, y));
     float pick = hash11(vSeed * 9.3 + 2.0);

@@ -77,7 +77,7 @@ void main() {
     float plain = (1.0 - glass) * (1.0 - villa) * (1.0 - civic);
 
     float floorH = mix(3.3, 3.9, glass);
-    vec2 g = vec2(vUv.x * mix(1.0, 2.0, glass * s1), y / floorH); // fin facades have half-width bays
+    vec2 g = vec2(vUv.x * mix(1.0, 2.0, glass), y / floorH); // curtain walls have half-width bays: finer, less like tiles
     vec2 cell = floor(g);
     vec2 f = fract(g);
     vec2 fw = max(fwidth(g), vec2(1e-4));
@@ -142,7 +142,10 @@ void main() {
     vec3 R = reflect(-V, n);
     R = normalize(R + (vec3(h1, h2, h3) - 0.5) * (mix(0.03, 0.004, glass) * detail));
     float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
-    vec3 mirror = (glass > 0.5 ? envColor(R) : envPlain(R)) * mix(0.75, 1.0, ao) * mix(0.62, 1.0, smoothstep(0.0, 90.0, y)); // low floors mirror the street, not the sky
+    // Seen from the air a window would mirror the ground, which turns every facade the colour of sand. What reads
+    // as glass is the sky in the direction the wall faces: bright toward a low sun, cool and dim away from it.
+    vec3 Rs = normalize(vec3(R.x, abs(R.y) * 0.5 + 0.08, R.z));
+    vec3 mirror = (glass > 0.5 ? envColor(Rs) : envPlain(Rs)) * mix(0.75, 1.0, ao) * mix(0.62, 1.0, smoothstep(0.0, 90.0, y)); // low floors mirror the street, not the sky
     vec3 tint = mix(vec3(1.0), vColor * 3.0, glass * 0.55);
     // A room behind every window (interior mapping): cast the view ray into a box one bay wide, one floor high
     // and five metres deep, and shade whichever surface it hits. Windows get depth and parallax for a few
@@ -151,7 +154,7 @@ void main() {
     float room = 0.55, curtain = 0.0;
     if (detail > 0.001 && win > 0.001) {
       vec3 rd = vec3(-dot(V, along), -V.y, max(dot(V, n), 0.02)); // z runs into the building
-      vec3 size = vec3(3.1 * mix(1.0, 0.5, glass * s1), floorH, 5.0);
+      vec3 size = vec3(3.1 * mix(1.0, 0.5, glass), floorH, 5.0);
       vec3 ro = vec3(f.x, f.y, 0.0) * size;
       vec3 reach = (step(0.0, rd) * size - ro) / (rd + sign(rd) * 1e-4 + 1e-5);
       float th = min(reach.x, min(reach.y, reach.z));
@@ -175,23 +178,38 @@ void main() {
     glassCol *= 1.0 - 0.5 * smoothstep(0.78, 0.97, (f.y - lo.y) / max(hi.y - lo.y, 0.01)) * plain * detail * typical;
     col = mix(wall, glassCol, win);
 
-    // Night: lit rooms. Per window up close, in blocks of rooms at mid distance, a dim average far away,
-    // so distant buildings stay dark shapes with lights on them instead of turning into grey boxes.
-    float chance = clamp(uLitFraction * (0.15 + 0.7 * seedA), 0.0, 0.97);
-    chance = mix(chance, max(chance, 0.85), step(0.95, hash11(cell.y * 13.7 + vSeed * 5.3)) * step(0.05, uLitFraction));
+    // Night. A lit facade is not a random checkerboard: light comes in runs. A flat spans a few bays and an
+    // office floor is in use or dark as a whole; inside a run the bays differ a little and some have blinds
+    // down. Colour runs from warm lamp light to neutral white, cooler in offices. At mid distance the runs
+    // become blocks, far away a dim average, so distant buildings stay dark shapes with lights on them.
+    float chance = clamp(uLitFraction * (0.2 + 0.6 * seedA), 0.0, 0.9);
+    float runLen = mix(2.0 + floor(hash11(cell.y * 7.1 + vSeed * 3.3) * 3.0), 6.0 + floor(hash11(cell.y * 5.3 + vSeed * 1.7) * 9.0), glass);
+    float run = floor((cell.x + floor(hash11(cell.y * 3.7 + vSeed) * runLen)) / runLen);
+    float hr = hash21(vec2(run, cell.y) + vSeed * 7.13);
+    float hc = hash21(vec2(run, cell.y) * 1.9 + vSeed * 2.3);
+    float inUse = mix(1.0, step(hash11(cell.y * 9.1 + vSeed * 2.9), 0.4) * 2.2, glass); // most office floors are empty at night
+    float litNear = step(hr, chance * inUse) * step(0.16, h1) * (0.4 + 0.8 * h3);
     float blockDetail = 1.0 - smoothstep(0.25, 0.7, max(fw.x, fw.y) / 3.0);
-    float blockLit = step(hash21(floor(g / 3.0) + vSeed * 5.1), chance * 0.7);
-    float litRooms = mix(mix(chance * 0.4, blockLit, blockDetail), step(h1, chance), detail);
-    float shopLit = step(0.3, hash11(cell.x * 3.1 + vSeed)) * shop;
-    float coolShare = mix(0.08, 0.4, glass);
-    vec3 warm = vec3(1.0, 0.68, 0.36), cool = vec3(0.78, 0.88, 1.0);
-    vec3 lamp = mix(mix(warm, cool, coolShare), mix(warm, cool, step(h2, coolShare)), detail);
-    float bright = mix(0.42, 0.12 + 1.5 * h3 * h3 * h3 * h3, detail) * mix(1.0, 0.5, glass);
+    vec2 blockId = floor(g / vec2(6.0, 2.0)) + vSeed * 5.1; // wide and low, like the runs
+    float blockLit = step(hash21(blockId), chance * 0.7) * (0.3 + 0.6 * hash21(blockId * 1.7 + 4.0));
+    float litRooms = mix(mix(chance * 0.3, blockLit, blockDetail), litNear, detail);
+    vec3 home = mix(vec3(1.0, 0.56, 0.24), vec3(1.0, 0.80, 0.54), hc);
+    vec3 office = mix(vec3(1.0, 0.80, 0.54), vec3(0.84, 0.92, 1.0), smoothstep(0.72, 0.95, hc));
+    vec3 lamp = mix(mix(vec3(1.0, 0.68, 0.40), vec3(0.96, 0.84, 0.66), glass), mix(home, office, glass), detail);
     float nightAmt = pow(uNight, 0.7);
-    col += lamp * (litRooms * win * typical * bright * nightAmt * 1.5 * mix(1.0, room * 1.9, detail));
-    col += warm * (shopLit * nightAmt * 0.9);
-    // Street lighting washes the first floors, more where the city is dense.
-    col += wallAlbedo * vec3(1.0, 0.6, 0.3) * (0.14 * uNight * exp(-y / 9.0) * (0.35 + 0.65 * info.a));
+    // Kept below the level where the tone curve bleaches colour: lamp light should stay amber, not go white.
+    col += lamp * (min(litRooms * mix(1.0, room * 1.9, detail), 1.0) * win * typical * nightAmt * mix(0.55, 0.42, glass));
+    float shopLit = step(0.3, hash11(cell.x * 3.1 + vSeed)) * shop;
+    col += vec3(1.0, 0.74, 0.46) * (shopLit * nightAmt * 0.9);
+    // The city lights its own walls: a strong sodium wash on the first floors and a faint one far up, so towers
+    // read as shapes and not as holes in the sky.
+    col += wallAlbedo * vec3(1.0, 0.62, 0.34) * (uNight * (0.22 * exp(-y / 10.0) + 0.06 * exp(-y / 70.0)) * (0.35 + 0.65 * info.a));
+    // Crown and setback lighting: a band of light at the top of each tier of a tall tower, in white, amber or blue.
+    float accent = step(110.0, top) * step(0.62, hash11(vSeed * 4.7 + 1.0)) * step(top - 1.5, y) * (1.0 - step(top - 0.3, y));
+    float pick = hash11(vSeed * 9.3 + 2.0);
+    vec3 accentCol = mix(vec3(0.90, 0.95, 1.0), vec3(1.0, 0.70, 0.36), step(0.4, pick));
+    accentCol = mix(accentCol, vec3(0.30, 0.55, 1.0), step(0.75, pick));
+    col += accentCol * (accent * uNight * 0.9);
   }
 
   col = applyFog(col, vWorldPos);

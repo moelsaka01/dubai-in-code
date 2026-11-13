@@ -86,7 +86,7 @@ export function createRoads(env) {
         float across = exp(-vUv.x * vUv.x * 1.6);
         float pool = 0.62 + 0.38 * cos((vUv.y - 20.0) * (6.2832 / 40.0));
         vec3 sodium = vec3(1.0, 0.56, 0.2);
-        col += sodium * uNight * (1.0 - rail) * (1.0 - skirt) * mix(0.02, 0.14 * across * pool, major * (1.0 - uCasing)) * mix(1.0, 3.0, uCasing);
+        col += sodium * uNight * (1.0 - rail) * (1.0 - skirt) * mix(0.07, 0.30 * across * pool, major * (1.0 - uCasing)) * mix(1.0, 1.6, uCasing);
 
         col = applyFog(col, vWorldPos);
         gl_FragColor = vec4(col, 1.0);
@@ -96,7 +96,7 @@ export function createRoads(env) {
   });
   const casingMaterial = make(true), roadMaterial = make(false);
 
-  const lights = createLightPoints(env, { capacity: 60000, color: [2.4, 1.45, 0.6], size: 6 });
+  const lights = createLightPoints(env, { capacity: 60000, color: [3.0, 1.75, 0.7], size: 7 });
   group.add(lights.object);
 
   const tiles = [];

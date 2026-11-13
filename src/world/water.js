@@ -81,7 +81,9 @@ export function createWater(env) {
         float sharp = mix(600.0, 40.0, clamp(lost * 60.0, 0.0, 1.0));
         col += uLightColor * lit * (pow(sp, sharp) * mix(6.0, 0.5, clamp(lost * 60.0, 0.0, 1.0)) + pow(sp, 60.0) * 0.2);
         // The city's lights smear across the water close to shore.
-        col += vec3(1.0, 0.62, 0.3) * uNight * (0.012 * shallow + 0.03 * info.a);
+        // Broken into streaks by the waves, the way lights lie on water.
+        float streak = pow(clamp(0.5 + slope.x * 9.0, 0.0, 1.0), 6.0);
+        col += vec3(1.0, 0.62, 0.3) * uNight * (0.012 * shallow + info.a * (0.03 + 0.4 * streak));
 
         col = applyFog(col, vWorldPos);
         col *= 1.0 + (hash21(gl_FragCoord.xy) - 0.5) * 0.03;

@@ -66,7 +66,7 @@ export function createLand(env) {
         vec3 side = albedo * (hemi(vec3(1.0, 0.0, 0.0)) + uLightColor * 0.35);
         vec3 col = mix(top, side, wall);
         // Spill from the city's lights: strongest inside the built-up blocks.
-        col += albedo * vec3(1.0, 0.6, 0.3) * uNight * (0.012 + 0.10 * info.a) * (1.0 - wall);
+        col += albedo * vec3(1.0, 0.6, 0.3) * uNight * (0.02 + 0.10 * info.a + 0.22 * info.b) * (1.0 - wall);
 
         col = applyFog(col, vWorldPos);
         gl_FragColor = vec4(col, 1.0);

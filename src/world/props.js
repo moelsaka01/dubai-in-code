@@ -84,6 +84,9 @@ export function carMaterial(env) {
       float glassy = step(0.5, vUv.x) * (1.0 - step(0.5, n.y));     // cabin sides are windows, its top is roof
       albedo = mix(paint, vec3(0.03, 0.04, 0.05), glassy);
       gloss = mix(0.45, 0.85, glassy);
+      // After dark: headlights on the nose, tail lights on the back. Two cars in five are parked with lights off.
+      float on = step(0.4, hash21(floor(vOrigin.xz * 1.7) + 9.0)) * step(vLocal.y, 1.0) * uNight;
+      emissive = (vec3(1.0, 0.95, 0.80) * step(2.12, vLocal.x) * 1.8 + vec3(1.0, 0.06, 0.03) * step(vLocal.x, -2.12) * 1.3) * on;
     `,
   });
 }

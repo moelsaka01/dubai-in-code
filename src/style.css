@@ -17,6 +17,7 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none; /* no pull-to-refresh or rubber-band scroll over the scene */
   background: var(--bg);
   color: var(--ink);
   font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -199,6 +200,13 @@ button[aria-pressed='true'] {
     right: 12px;
     justify-content: flex-start;
     max-width: none;
+  }
+
+  /* The credit and the panel take the bottom; the readout moves under the chips. */
+  #perf {
+    bottom: auto;
+    top: 190px;
+    left: 12px;
   }
 
   #panel {

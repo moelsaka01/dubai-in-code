@@ -129,7 +129,10 @@ export function createApp(canvas) {
   controls.target.copy(tour.first.look);
   camera.lookAt(tour.first.look);
 
-  let autoTour = params.tour; // play once when the city has loaded, unless the user has already taken over
+  // Phones and tablets (coarse pointer or a narrow screen) start in Low; ?q overrides. Reduced motion: no automatic tour.
+  const small = window.matchMedia('(pointer: coarse)').matches || Math.min(window.innerWidth, window.innerHeight) < 600;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let autoTour = params.tour && !reducedMotion; // play once when the city has loaded, unless the user has already taken over
   function startTour() {
     controls.enabled = false;
     tour.start();
@@ -166,7 +169,8 @@ export function createApp(canvas) {
     : null;
 
   // URL parameters: quality, time of day and camera.
-  if (params.q) setQuality(params.q);
+  const startLevel = params.q || (small ? 'low' : null);
+  if (startLevel) setQuality(startLevel);
   if (params.t !== null) {
     env.setTime(params.t);
     ui.setTime(params.t);

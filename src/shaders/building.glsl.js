@@ -44,6 +44,19 @@ float kindIs(float k) {
   return 1.0 - step(0.5, abs(vKind - k));
 }
 
+// Lit rooms on one floor come in runs of bays. Returns 1 where bay cx of floor cy is in a lit run, and the run's
+// lamp tone in [0, 1]. Where a run is narrower than a pixel (fwx bays) it returns the floor's mean instead.
+float litRun(float cx, float cy, float glass, float chance, float fwx, out float tone) {
+  float runLen = mix(2.0 + floor(hash11(cy * 7.1 + vSeed * 3.3) * 3.0), 6.0 + floor(hash11(cy * 5.3 + vSeed * 1.7) * 9.0), glass);
+  float run = floor((cx + floor(hash11(cy * 3.7 + vSeed) * runLen)) / runLen);
+  float hr = hash21(vec2(run, cy) + vSeed * 7.13);
+  float inUse = mix(1.0, step(hash11(cy * 9.1 + vSeed * 2.9), 0.4) * 2.2, glass); // most office floors are empty at night
+  float p = min(chance * inUse, 1.0);
+  float sharp = 1.0 - smoothstep(0.35, 1.0, fwx / runLen);
+  tone = mix(0.5, hash21(vec2(run, cy) * 1.9 + vSeed * 2.3), sharp);
+  return mix(p, step(hr, p), sharp);
+}
+
 void main() {
   vec3 n = normalize(vNormal);
   vec3 V = normalize(cameraPosition - vWorldPos);
@@ -182,20 +195,26 @@ void main() {
     // office floor is in use or dark as a whole; inside a run the bays differ a little and some have blinds
     // down. Colour runs from warm lamp light to neutral white, cooler in offices. At mid distance the runs
     // become blocks, far away a dim average, so distant buildings stay dark shapes with lights on them.
+    //
+    // From the air the pattern must not change, only blur: the same runs are drawn at every distance. Where a
+    // bay is smaller than a pixel a run is one dash, a floor high. Where a floor is smaller than a pixel the
+    // dash is blended with the floor next to it, and beyond that the wall takes the mean of its runs. (Blocks of
+    // 6 bays by 2 floors stood here before: a second, coarser pattern that read as tiles.)
     float chance = clamp(uLitFraction * (0.2 + 0.6 * seedA), 0.0, 0.9);
-    float runLen = mix(2.0 + floor(hash11(cell.y * 7.1 + vSeed * 3.3) * 3.0), 6.0 + floor(hash11(cell.y * 5.3 + vSeed * 1.7) * 9.0), glass);
-    float run = floor((cell.x + floor(hash11(cell.y * 3.7 + vSeed) * runLen)) / runLen);
-    float hr = hash21(vec2(run, cell.y) + vSeed * 7.13);
-    float hc = hash21(vec2(run, cell.y) * 1.9 + vSeed * 2.3);
-    float inUse = mix(1.0, step(hash11(cell.y * 9.1 + vSeed * 2.9), 0.4) * 2.2, glass); // most office floors are empty at night
-    float litNear = step(hr, chance * inUse) * step(0.16, h1) * (0.4 + 0.8 * h3);
-    float blockDetail = 1.0 - smoothstep(0.25, 0.7, max(fw.x, fw.y) / 3.0);
-    vec2 blockId = floor(g / vec2(6.0, 2.0)) + vSeed * 5.1; // wide and low, like the runs
-    float blockLit = step(hash21(blockId), chance * 0.7) * (0.3 + 0.6 * hash21(blockId * 1.7 + 4.0));
-    float litRooms = mix(mix(chance * 0.3, blockLit, blockDetail), litNear, detail);
+    float hcA, hcB;
+    float runA = litRun(cell.x, cell.y, glass, chance, fw.x, hcA);
+    float litNear = runA * step(0.16, h1) * (0.4 + 0.8 * h3);
+    float side = f.y > 0.5 ? 1.0 : -1.0;
+    float runB = litRun(cell.x, cell.y + side, glass, chance, fw.x, hcB);
+    float spill = clamp((abs(f.y - 0.5) + 0.5 * fw.y - 0.5) / fw.y, 0.0, 0.5); // share of this pixel on the next floor
+    float floors = 1.0 - smoothstep(0.9, 2.4, fw.y);
+    float mean = chance * mix(1.0, 0.88, glass);
+    float litMid = mix(mean, mix(runA, runB, spill), floors) * 0.67; // 0.67: the mean of the bays inside a run
+    float litRooms = mix(litMid, litNear, detail);
+    float hc = mix(0.5, mix(hcA, hcB, spill), floors);
     vec3 home = mix(vec3(1.0, 0.56, 0.24), vec3(1.0, 0.80, 0.54), hc);
     vec3 office = mix(vec3(1.0, 0.80, 0.54), vec3(0.84, 0.92, 1.0), smoothstep(0.72, 0.95, hc));
-    vec3 lamp = mix(mix(vec3(1.0, 0.68, 0.40), vec3(0.96, 0.84, 0.66), glass), mix(home, office, glass), detail);
+    vec3 lamp = mix(home, office, glass);
     float nightAmt = pow(uNight, 0.7);
     // Kept below the level where the tone curve bleaches colour: lamp light should stay amber, not go white.
     col += lamp * (min(litRooms * mix(1.0, room * 1.9, detail), 1.0) * win * typical * nightAmt * mix(0.55, 0.42, glass));

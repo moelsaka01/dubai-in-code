@@ -17,6 +17,7 @@ import { createControls } from './camera/controls.js';
 import { createTour } from './camera/tour.js';
 import { createUI } from './ui/ui.js';
 import { createPerf } from './ui/perf.js';
+import { parseParams } from './ui/params.js';
 import { createPost } from './post.js';
 
 // lodFar: beyond it a tile draws only its >= 40 m buildings. minorFar: beyond it class >= 4 roads are hidden.
@@ -34,6 +35,7 @@ const MIN_SCALE = 0.5;
 const SLOW_MS = 20.5, FAST_MS = 17.6, WINDOW_MS = 750;
 
 export function createApp(canvas) {
+  const params = parseParams();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.info.autoReset = false; // count a whole frame, including the post passes
   const scene = new THREE.Scene();
@@ -126,7 +128,7 @@ export function createApp(canvas) {
   controls.target.copy(tour.first.look);
   camera.lookAt(tour.first.look);
 
-  let autoTour = true; // play once when the city has loaded, unless the user has already taken over
+  let autoTour = params.tour; // play once when the city has loaded, unless the user has already taken over
   function startTour() {
     controls.enabled = false;
     tour.start();
@@ -158,9 +160,22 @@ export function createApp(canvas) {
     },
   });
   ui.setTime(env.t);
-  const perf = new URLSearchParams(location.search).has('perf')
+  const perf = params.perf
     ? createPerf(() => app.stats(), () => res, () => level)
     : null;
+
+  // URL parameters: quality, time of day and camera.
+  if (params.q) setQuality(params.q);
+  if (params.t !== null) {
+    env.setTime(params.t);
+    ui.setTime(params.t);
+  }
+  if (params.cam) {
+    const [x, y, z, tx, ty, tz] = [...params.cam.position, ...params.cam.target];
+    camera.position.set(x, y, z);
+    controls.target.set(tx, ty, tz);
+    camera.lookAt(controls.target);
+  }
 
   // Any input on the scene skips the tour.
   const takeOver = (e) => {
@@ -210,7 +225,7 @@ export function createApp(canvas) {
     landmarks = createLandmarks(env, city.landmarks, buildings.beacons);
     traffic = createTraffic(env, city.traffic);
     scene.add(landmarks.object, traffic.object);
-    const focus = [tour.first.position.x, -tour.first.position.z];
+    const focus = [camera.position.x, -camera.position.z]; // the start pose, or ?cam
     const result = await city.stream({
       focus,
       onLand: (m) => {

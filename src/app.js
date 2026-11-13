@@ -38,6 +38,8 @@ const QUALITY = {
   low: { dpr: 1, bloom: false, lodFar: 4500, minorFar: 3000, plantFar: 0, props: false },
 };
 const FOV = 50;
+// Palms and trees are drawn into the sun shadow map only while its box is narrower than this (half-width, m).
+const TREE_SHADOW_HALF = 1100;
 // Lives in src/world/props.js (FAR, metres from the edge of a 2 km cell): palms 1900, trees 1900, cars 1000, boats 6000.
 // Lives in src/world/sunShadow.js: shadow map 2048 px; half-width of the box 700..2600 m (0.9 x reach + 300);
 //   reach capped at 2800 m (1500 m when looking level); towers-only draw beyond 1400 m, no roof plant.
@@ -80,7 +82,7 @@ export function createApp(canvas) {
   const buildings = createBuildings(env);
   const roads = createRoads(env);
   const props = createProps(env);
-  scene.add(sky.object, water.object, land.object, roads.object, buildings.object, props.object);
+  scene.add(sky.object, water.object, land.object, roads.object, roads.casters, buildings.object, props.object);
   let traffic = null, landmarks = null;
 
   const post = createPost(renderer, scene, camera);
@@ -240,7 +242,15 @@ export function createApp(canvas) {
     const q = QUALITY[level];
     sky.update(camera);
     // Crisp shadows near the camera (High only). Its own pass over buildings, landmarks and trees.
-    if (loaded && q.bloom) sunShadow.update(scene, camera, [sky.object, water.object, land.object, roads.object, traffic.object, buildings.beacons.object, props.object], buildings);
+    if (loaded && q.bloom) {
+      // Palms and trees cast too, but only when the shadow box is small (camera low and close): from the air
+      // their shadows are under a pixel and the pass would draw every tree in view for nothing.
+      const trees = q.props && sunShadow.half < TREE_SHADOW_HALF;
+      if (trees) props.castOnly(); // props.update() below restores the cars and boats
+      const hide = [sky.object, water.object, land.object, roads.object, traffic.object, buildings.beacons.object];
+      if (!trees) hide.push(props.object);
+      sunShadow.update(scene, camera, hide, buildings, [roads.casters]);
+    }
     else env.uniforms.uSunOn.value = 0;
     buildings.update(camera, q.lodFar, q.plantFar);
     props.object.visible = q.props;

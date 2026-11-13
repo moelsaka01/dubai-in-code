@@ -183,11 +183,15 @@ export function createProps(env) {
           mesh.visible = false;
           group.add(mesh);
           const [cx, cz] = key.split('_').map(Number);
-          meshes.push({ mesh, far: FAR[kind], centre: new THREE.Vector3((cx + 0.5) * CELL - HALF, 0, (cz + 0.5) * CELL - HALF) });
+          meshes.push({ mesh, casts: kind === 'palms' || kind === 'trees', far: FAR[kind], centre: new THREE.Vector3((cx + 0.5) * CELL - HALF, 0, (cz + 0.5) * CELL - HALF) });
           counts[kind] += n;
         }
         k.cells.clear();
       }
+    },
+    /** For the shadow pass: leave only palms and trees visible. The next update() puts everything back. */
+    castOnly() {
+      for (const t of meshes) if (!t.casts) t.mesh.visible = false;
     },
     update(camera) {
       for (const t of meshes) t.mesh.visible = centre.copy(t.centre).sub(camera.position).length() - CELL * 0.71 < t.far;

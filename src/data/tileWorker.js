@@ -198,6 +198,7 @@ function buildRoads(list, e0, n0) {
   const idx = new Uint32Array(nIdx);
   const bounds = new Bounds();
   const lights = [];
+  const cast = []; // triangles of everything that stands off the ground (decks, piers), for the shadow pass
   let v = 0, ii = 0;
 
   for (const r of order) {
@@ -254,6 +255,11 @@ function buildRoads(list, e0, n0) {
       }
     }
     if (!up) continue;
+    for (let j = 0; j < n - 1; j++) {
+      const o = j * 6; // left, right of this vertex pair, then of the next
+      cast.push(edge[o], edge[o + 1], edge[o + 2], edge[o + 3], edge[o + 4], edge[o + 5], edge[o + 9], edge[o + 10], edge[o + 11]);
+      cast.push(edge[o], edge[o + 1], edge[o + 2], edge[o + 9], edge[o + 10], edge[o + 11], edge[o + 6], edge[o + 7], edge[o + 8]);
+    }
     // Skirts: the deck edge dropped 1.4 m, so a bridge has thickness. Marked with |uv.x| = 2 for the shader.
     for (let s = 0; s < 2; s++) {
       const start = v;
@@ -289,9 +295,10 @@ function buildRoads(list, e0, n0) {
       }
       idx[ii++] = a; idx[ii++] = a + 1; idx[ii++] = a + 2;
       idx[ii++] = a; idx[ii++] = a + 2; idx[ii++] = a + 3;
+      for (const c of [a, a + 1, a + 2, a, a + 2, a + 3]) cast.push(pos[c * 3], pos[c * 3 + 1], pos[c * 3 + 2]);
     }
   }
-  return { position: pos, uv, side, info, index: idx, majorIndexCount: nMajor, ...bounds.sphere(), lights: new Float32Array(lights) };
+  return { cast: new Float32Array(cast), position: pos, uv, side, info, index: idx, majorIndexCount: nMajor, ...bounds.sphere(), lights: new Float32Array(lights) };
 }
 
 // ---------- street life ----------

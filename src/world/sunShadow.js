@@ -52,13 +52,16 @@ export function createSunShadow(renderer, env) {
   let tick = 0;
 
   return {
+    /** Half-width in metres of the box the map covered at its last refresh: small when the camera is low and close. */
+    half: 2600,
     /**
      * @param {THREE.Scene} scene
      * @param {THREE.Camera} camera the viewer
      * @param {THREE.Object3D[]} hide everything that must not cast (ground, water, sky, lights)
      * @param {{ update: Function }} buildings so far tiles can drop to tall-only for this pass
+     * @param {THREE.Object3D[]} show objects that exist only to cast shadows (bridge decks); visible for this pass alone
      */
-    update(scene, camera, hide, buildings) {
+    update(scene, camera, hide, buildings, show = []) {
       if (env.shadow <= 0) {
         env.uniforms.uSunOn.value = 0;
         return;
@@ -71,6 +74,7 @@ export function createSunShadow(renderer, env) {
       focus.copy(camera.position).addScaledVector(forward, reach);
       focus.y = 0;
       const half = Math.min(2600, Math.max(700, reach * 0.9 + 300));
+      this.half = half;
 
       toLight.copy(env.uniforms.uLightDir.value);
       light.left = light.bottom = -half;
@@ -92,6 +96,7 @@ export function createSunShadow(renderer, env) {
       buildings.update(fake, 1400, 0); // beyond 1.4 km only towers matter, and no roof plant
       const wasVisible = hide.map((o) => o.visible);
       hide.forEach((o) => { o.visible = false; });
+      show.forEach((o) => { o.visible = true; });
       const prevTarget = renderer.getRenderTarget();
       scene.overrideMaterial = depthMaterial;
       renderer.setRenderTarget(target);
@@ -100,6 +105,7 @@ export function createSunShadow(renderer, env) {
       scene.overrideMaterial = null;
       renderer.setRenderTarget(prevTarget);
       hide.forEach((o, i) => { o.visible = wasVisible[i]; });
+      show.forEach((o) => { o.visible = false; });
 
       env.uniforms.uSunMatrix.value.multiplyMatrices(bias, light.projectionMatrix).multiply(light.matrixWorldInverse);
       env.uniforms.uSunTexel.value = texel;

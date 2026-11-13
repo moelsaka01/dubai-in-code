@@ -101,12 +101,28 @@ export function createRoads(env) {
 
   const tiles = [];
   const centre = new THREE.Vector3();
+  // Bridge decks and piers again, as bare triangles: drawn only into the sun shadow map, so that what stands off
+  // the ground also casts a shadow on it. Kept out of the normal frame (the group is never visible there).
+  const casters = new THREE.Group();
+  casters.visible = false;
+  const casterMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 
   return {
     object: group,
+    casters,
     lights,
     addTile(origin, d) {
       lights.add(d.lights);
+      if (d.cast && d.cast.length) {
+        const cg = new THREE.BufferGeometry();
+        cg.setAttribute('position', new THREE.BufferAttribute(d.cast, 3));
+        cg.computeBoundingSphere();
+        const cm = new THREE.Mesh(cg, casterMaterial);
+        cm.position.set(origin[0], origin[1], origin[2]);
+        cm.updateMatrix();
+        cm.matrixAutoUpdate = false;
+        casters.add(cm);
+      }
       if (!d.index.length) return;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(d.position, 3));

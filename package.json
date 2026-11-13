@@ -11,7 +11,8 @@
     "data:fetch": "node scripts/fetch-osm.mjs",
     "data:build": "node scripts/build-data.mjs",
     "data:stats": "node scripts/stats.mjs",
-    "usage": "node scripts/usage.mjs"
+    "usage": "node scripts/usage.mjs",
+    "check": "node scripts/check.mjs"
   },
   "dependencies": {
     "earcut": "^3.2.4",

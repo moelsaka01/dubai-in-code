@@ -7,15 +7,25 @@ import { carGeometry, carMaterial } from './props.js';
 const CAR_Y = 2.6; // height of the light glow
 const BODY_Y = 1.72; // wheels on the motorway surface
 
-export function createTraffic(env, traffic, count = 1500) {
+/**
+ * @param traffic traffic.json
+ * @param heights bridges.json: for each polyline in the same order, runs of deck height sampled every `step` metres
+ */
+export function createTraffic(env, traffic, heights = { step: 8, traffic: [] }, count = 1500) {
   // Arc-length tables.
   const lines = [];
+  let lineNo = 0;
   const addLine = (pts, halfSpread, weight) => {
     const n = pts.length / 2;
+    const runs = heights.traffic[lineNo++] || [];
     if (n < 2) return;
     const cum = new Float32Array(n);
     for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]);
-    if (cum[n - 1] > 100) lines.push({ pts, cum, length: cum[n - 1], halfSpread, weight: cum[n - 1] * weight });
+    if (cum[n - 1] <= 100) return;
+    // Height of the motorway under the line where it is on a bridge, one sample every `step` metres.
+    const lift = new Float32Array(Math.ceil(cum[n - 1] / heights.step) + 2);
+    for (const run of runs) for (let i = 1; i < run.length; i++) if (run[0] + i - 1 < lift.length) lift[run[0] + i - 1] = run[i];
+    lines.push({ pts, cum, length: cum[n - 1], halfSpread, weight: cum[n - 1] * weight, lift });
   };
   for (const p of traffic.szr) addLine(p, 9, 1.7); // Sheikh Zayed Road: wide and busy
   for (const p of traffic.motorways) addLine(p, 4.5, 1);
@@ -112,14 +122,16 @@ export function createTraffic(env, traffic, count = 1500) {
       de /= len; dn /= len;
       const e = ax + (bx - ax) * f + dn * c.lateral; // lateral offset to the right of travel
       const north = an + (bn - an) * f - de * c.lateral;
-      P[3 * i] = e; P[3 * i + 1] = CAR_Y; P[3 * i + 2] = -north;
+      const hs = c.s / heights.step, h0 = Math.floor(hs);
+      const up = l.lift[h0] + (l.lift[h0 + 1] - l.lift[h0]) * (hs - h0);
+      P[3 * i] = e; P[3 * i + 1] = CAR_Y + up; P[3 * i + 2] = -north;
       D[2 * i] = de; D[2 * i + 1] = -dn;
       // Rotation about y that turns the car's +x axis to its heading, then the position (column-major).
       const o = 16 * i;
       M[o] = de; M[o + 1] = 0; M[o + 2] = -dn; M[o + 3] = 0;
       M[o + 4] = 0; M[o + 5] = 1; M[o + 6] = 0; M[o + 7] = 0;
       M[o + 8] = dn; M[o + 9] = 0; M[o + 10] = de; M[o + 11] = 0;
-      M[o + 12] = e; M[o + 13] = BODY_Y; M[o + 14] = -north; M[o + 15] = 1;
+      M[o + 12] = e; M[o + 13] = BODY_Y + up; M[o + 14] = -north; M[o + 15] = 1;
     }
     bodies.instanceMatrix.needsUpdate = true;
     iPos.needsUpdate = true;

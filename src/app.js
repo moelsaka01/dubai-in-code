@@ -263,7 +263,7 @@ export function createApp(canvas) {
   const ready = (async () => {
     const city = await openCity();
     landmarks = createLandmarks(env, city.landmarks, buildings.beacons);
-    traffic = createTraffic(env, city.traffic);
+    traffic = createTraffic(env, city.traffic, city.bridges);
     scene.add(landmarks.object, traffic.object);
     const focus = [camera.position.x, -camera.position.z]; // the start pose, or ?cam
     const result = await city.stream({

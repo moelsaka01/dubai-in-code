@@ -179,4 +179,7 @@ writeFileSync(REPORT, JSON.stringify({
   szr: { lines: szr.lines.length, lengthsM: szr.lines.map((l) => { let L = 0; for (let i = 2; i < l.length; i += 2) L += Math.hypot(l[i] - l[i - 2], l[i + 1] - l[i - 1]); return Math.round(L); }) },
   landmarks: Object.fromEntries(Object.entries(landmarks).map(([k, v]) => [k, { dropped: v.dropped.length, footprintId: v.footprintId, rotation: v.rotation }])),
 }, null, 1));
+// ---- bridge heights, from the tiles and traffic.json just written ----
+const { buildBridges } = await import('./build-bridges.mjs');
+log(`bridges.json: ${JSON.stringify(buildBridges(OUT))}`);
 log(`done in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

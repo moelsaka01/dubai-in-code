@@ -16,6 +16,8 @@ export async function openCity() {
   const [manifest, landmarks, traffic] = await Promise.all(
     ['manifest.json', 'landmarks.json', 'traffic.json'].map((f) => getJson(new URL(f, base))),
   );
+  // Bridge heights are an extra: without the file bridges still rise, they just do not join across tiles.
+  const bridges = await getJson(new URL('bridges.json', base)).catch(() => ({ step: 8, nodes: [], traffic: [] }));
 
   /**
    * @param {{ focus: [number, number], onLand: Function, onTile: Function, onProgress: Function }} h
@@ -24,6 +26,7 @@ export async function openCity() {
   function stream({ focus, onLand, onTile, onProgress }) {
     return new Promise((resolve, reject) => {
       const worker = new Worker(new URL('./tileWorker.js', import.meta.url), { type: 'module' });
+      worker.postMessage({ type: 'bridges', nodes: bridges.nodes });
       const centre = (t) => [GRID_MIN + (t.tx + 0.5) * TILE_SIZE, GRID_MIN + (t.ty + 0.5) * TILE_SIZE];
       const dist = (t) => { const c = centre(t); return Math.hypot(c[0] - focus[0], c[1] - focus[1]); };
       const queue = manifest.tiles.slice().sort((a, b) => dist(a) - dist(b))
@@ -57,5 +60,5 @@ export async function openCity() {
     });
   }
 
-  return { manifest, landmarks: landmarks.landmarks, traffic, stream };
+  return { manifest, landmarks: landmarks.landmarks, traffic, bridges, stream };
 }

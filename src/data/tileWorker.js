@@ -5,15 +5,24 @@ import earcut from 'earcut';
 import { decodeTile, decodeLand } from '../shared/format.js';
 import { TILE_SIZE, GRID_MIN } from '../shared/config.js';
 import { buildBuildings, centroid, inside, rng } from './buildingMesh.js';
+import { deckHeight, isRaised, nodeKey, liftOf } from '../shared/bridges.js';
 
 const LAND_Y = 1.5; // top of the land slab
 const COVER_Y = 1.55; // parks and beaches
 const ROAD_Y = 1.6;
 const BAY = 3.1; // target window bay width in metres
 const LIGHT_SPACING = 40;
+const PIER_SPACING = 36, PIER_HALF = 0.9;
+// Where bridge ways meet, city-wide: key -> [distance to ground, reach, deck height]. Sent once by the loader
+// before the first tile (public/data/bridges.json). Without it every bridge is treated as standing alone.
+const BRIDGE_NODES = new Map();
 
 self.onmessage = async (e) => {
   const m = e.data;
+  if (m.type === 'bridges') {
+    for (let i = 0; i < m.nodes.length; i += 5) BRIDGE_NODES.set(nodeKey(m.nodes[i], m.nodes[i + 1]), [m.nodes[i + 2], m.nodes[i + 3], m.nodes[i + 4]]);
+    return;
+  }
   try {
     const res = await fetch(m.url);
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${m.url}`);
@@ -117,9 +126,19 @@ function halfWidth(r) {
   return (Math.max(r.lanes, 2) * 3.3 + 1.2) / 2;
 }
 
-/** How high a bridge deck stands, from its OSM layer. */
-function deckHeight(r) {
-  return 6 + Math.max(0, r.layer - 1) * 5;
+/**
+ * Height profile of a raised way: returns (metres along it) -> metres above its base. Ends that meet another
+ * bridge way, in this tile or the next, carry on at that way's height; ends that meet the ground ramp down.
+ */
+function bridgeLift(r, e0, n0) {
+  const p = r.pts, n = p.length;
+  let total = 0;
+  for (let i = 2; i < n; i += 2) total += Math.hypot(p[i] - p[i - 2], p[i + 1] - p[i - 1]);
+  const a = BRIDGE_NODES.get(nodeKey(e0 + p[0], n0 + p[1])), b = BRIDGE_NODES.get(nodeKey(e0 + p[n - 2], n0 + p[n - 1]));
+  const ref = a || b;
+  const reach = ref ? ref[1] : total / 2, top = ref ? ref[2] : deckHeight(r.cls, r.layer);
+  const dS = a ? a[0] : 0, dE = b ? b[0] : 0;
+  return (s) => liftOf(s, total, dS, dE, reach, top);
 }
 
 function buildRoads(list, e0, n0) {
@@ -128,18 +147,43 @@ function buildRoads(list, e0, n0) {
   // Major classes first, so a far tile can draw only the first part of the index buffer.
   const order = use.filter((r) => !isMinor(r)).concat(use.filter(isMinor));
 
-  // Bridges rise off the ground (motorways and rail stay flat: their traffic and viaducts are drawn at grade).
-  // A deck ramps up from an end that meets the ground and stays level where it meets another bridge piece.
-  const raised = (r) => (r.flags & 1) !== 0 && r.cls !== 0 && r.cls !== 7;
-  const ends = new Map();
-  const key = (x, y) => `${Math.round(x)}_${Math.round(y)}`;
+  // Bridges rise off the ground: roads, motorways (their traffic follows, see traffic.js) and the Metro.
+  const raised = isRaised;
+
+  // Piers: a column under a raised deck every PIER_SPACING metres where it is high enough to need one, unless
+  // the column would stand in a road that passes underneath.
+  const ground = [];
+  for (const r of order) {
+    if (raised(r)) continue;
+    const hw = halfWidth(r);
+    for (let i = 0; i < r.pts.length - 2; i += 2) ground.push(r.pts[i], r.pts[i + 1], r.pts[i + 2], r.pts[i + 3], hw);
+  }
+  const blocked = (x, y) => {
+    for (let g = 0; g < ground.length; g += 5) {
+      const ax = ground[g], ay = ground[g + 1], dx = ground[g + 2] - ax, dy = ground[g + 3] - ay;
+      if (Math.abs(x - ax) > 400 || Math.abs(y - ay) > 400) continue;
+      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
+      if (Math.hypot(x - ax - dx * t, y - ay - dy * t) < ground[g + 4] + PIER_HALF + 0.6) return true;
+    }
+    return false;
+  };
+  const piers = []; // x, north, top, class
   for (const r of order) {
     if (!raised(r)) continue;
-    const p = r.pts, n = p.length;
-    for (const k of [key(p[0], p[1]), key(p[n - 2], p[n - 1])]) ends.set(k, (ends.get(k) || 0) + 1);
+    const lift = bridgeLift(r, e0, n0), pts = r.pts;
+    let along = 0, next = PIER_SPACING / 2;
+    for (let j = 0; j < pts.length - 2; j += 2) {
+      const len = Math.hypot(pts[j + 2] - pts[j], pts[j + 3] - pts[j + 1]);
+      for (; next <= along + len; next += PIER_SPACING) {
+        const f = (next - along) / (len || 1), h = lift(next);
+        const x = pts[j] + (pts[j + 2] - pts[j]) * f, y = pts[j + 1] + (pts[j + 3] - pts[j + 1]) * f;
+        if (h > 2.6 && !blocked(x, y)) piers.push(x, y, ROAD_Y + h - 1.2, r.cls);
+      }
+      along += len;
+    }
   }
 
-  let nVert = 0, nIdx = 0, nMajor = 0;
+  let nVert = piers.length * 4, nIdx = (piers.length / 4) * 24, nMajor = 0;
   for (const r of order) {
     const n = r.pts.length / 2;
     const strips = raised(r) ? 3 : 1; // deck plus a skirt down each side
@@ -163,14 +207,7 @@ function buildRoads(list, e0, n0) {
     const base = ROAD_Y + (r.cls === 7 ? 0.3 : (5 - Math.min(r.cls, 5)) * 0.02) + Math.max(0, r.layer) * 0.12;
     const lit = r.cls <= 2;
     const up = raised(r);
-    let total = 0;
-    if (up) for (let j = 0; j < n - 1; j++) total += Math.hypot(pts[2 * j + 2] - pts[2 * j], pts[2 * j + 3] - pts[2 * j + 1]);
-    const peak = up ? Math.min(deckHeight(r), total * 0.08) : 0;
-    const ramp = Math.min(70, total / 2);
-    const rampStart = up && ends.get(key(pts[0], pts[1])) < 2;
-    const rampEnd = up && ends.get(key(pts[2 * n - 2], pts[2 * n - 1])) < 2;
-    const ease = (t) => { const k = Math.min(1, Math.max(0, t)); return k * k * (3 - 2 * k); };
-    const lift = (s) => peak * (rampStart ? ease(s / ramp) : 1) * (rampEnd ? ease((total - s) / ramp) : 1);
+    const lift = up ? bridgeLift(r, e0, n0) : null;
 
     let along = 0, nextLight = LIGHT_SPACING / 2;
     const first = v;
@@ -238,6 +275,22 @@ function buildRoads(list, e0, n0) {
       }
     }
   }
+  // Piers go last in the index buffer, so they disappear with the minor roads at a distance.
+  for (let k = 0; k < piers.length; k += 4) {
+    const x = piers[k], q = piers[k + 1], top = piers[k + 2];
+    const cx = [-1, 1, 1, -1], cq = [-1, -1, 1, 1];
+    for (let f = 0; f < 4; f++) {
+      const g = (f + 1) % 4, a = v;
+      for (const [c, y] of [[f, LAND_Y], [g, LAND_Y], [g, top], [f, top]]) {
+        pos[v * 3] = x + cx[c] * PIER_HALF; pos[v * 3 + 1] = y; pos[v * 3 + 2] = -(q + cq[c] * PIER_HALF);
+        uv[v * 2] = 2; uv[v * 2 + 1] = 0;
+        info[v * 4] = piers[k + 3]; info[v * 4 + 1] = 1; info[v * 4 + 2] = 1; info[v * 4 + 3] = 8;
+        v++;
+      }
+      idx[ii++] = a; idx[ii++] = a + 1; idx[ii++] = a + 2;
+      idx[ii++] = a; idx[ii++] = a + 2; idx[ii++] = a + 3;
+    }
+  }
   return { position: pos, uv, side, info, index: idx, majorIndexCount: nMajor, ...bounds.sphere(), lights: new Float32Array(lights) };
 }
 
@@ -252,6 +305,37 @@ const MAX_PALMS = 1500, MAX_CARS = 700;
 function buildProps(tile, e0, n0) {
   const palms = [], trees = [], cars = [];
   const rnd = rng(tile.tx * 7919 + tile.ty * 104729 + 17);
+  // Every road segment of the tile in a coarse grid, to ask "is this spot on a road?" and "is it under a deck?".
+  // A palm planted beside one road used to stand in the next carriageway wherever two roads run close together
+  // (junctions, slip roads, bridge approaches), and cars stood under, and through, the bridges above them.
+  const CELL = 40, grid = new Map();
+  for (const r of tile.roads) {
+    if (r.flags & 2) continue;
+    const pts = r.pts, hw = halfWidth(r), deck = isRaised(r);
+    for (let i = 0; i < pts.length - 2; i += 2) {
+      const seg = [pts[i], pts[i + 1], pts[i + 2], pts[i + 3], hw, deck, r];
+      const x0 = Math.floor((Math.min(seg[0], seg[2]) - 16) / CELL), x1 = Math.floor((Math.max(seg[0], seg[2]) + 16) / CELL);
+      const y0 = Math.floor((Math.min(seg[1], seg[3]) - 16) / CELL), y1 = Math.floor((Math.max(seg[1], seg[3]) + 16) / CELL);
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+        const k = x * 4096 + y;
+        let cell = grid.get(k);
+        if (!cell) grid.set(k, cell = []);
+        cell.push(seg);
+      }
+    }
+  }
+  /** True when (x, y) is within `margin` of the edge of a road other than `own`; with decksOnly, of a raised deck. */
+  const onRoad = (x, y, margin, own, decksOnly) => {
+    const cell = grid.get(Math.floor(x / CELL) * 4096 + Math.floor(y / CELL));
+    if (!cell) return false;
+    for (const g of cell) {
+      if (g[6] === own || (decksOnly && !g[5])) continue;
+      const dx = g[2] - g[0], dy = g[3] - g[1];
+      const t = Math.min(1, Math.max(0, ((x - g[0]) * dx + (y - g[1]) * dy) / (dx * dx + dy * dy || 1)));
+      if (Math.hypot(x - g[0] - dx * t, y - g[1] - dy * t) < g[4] + margin) return true;
+    }
+    return false;
+  };
   for (const r of tile.roads) {
     if (r.flags & 3 || r.cls === 0 || r.cls >= 6) continue; // not on bridges, in tunnels, on motorways, ramps or rail
     const pts = r.pts, n = pts.length / 2;
@@ -267,7 +351,8 @@ function buildProps(tile, e0, n0) {
       while (lined && nextPalm <= along + len && palms.length < MAX_PALMS * 4) {
         const f = nextPalm - along, off = (hw + 2.6) * side;
         // right of travel is (dn, -dx) in plan
-        palms.push(e0 + ax + dx * f + dn * off, -(n0 + an + dn * f - dx * off), 0.8 + rnd() * 0.5, rnd() * 6.283);
+        const px = ax + dx * f + dn * off, pn = an + dn * f - dx * off, size = 0.8 + rnd() * 0.5, turn = rnd() * 6.283;
+        if (!onRoad(px, pn, 1.6, r, false)) palms.push(e0 + px, -(n0 + pn), size, turn);
         side = -side;
         nextPalm += spacing * (0.5 + rnd() * 0.25);
       }
@@ -276,7 +361,8 @@ function buildProps(tile, e0, n0) {
         const right = rnd() < 0.5 ? 1 : -1; // which side of the centre line; drive on the right
         const off = Math.min(hw - 1.3, 1.7 + Math.floor(rnd() * Math.max(1, r.lanes / 2)) * 3.3) * right;
         const heading = Math.atan2(dn * right, dx * right); // plan angle of travel
-        cars.push(e0 + ax + dx * f + dn * off, -(n0 + an + dn * f - dx * off), 0.9 + rnd() * 0.25, heading);
+        const cx = ax + dx * f + dn * off, cn = an + dn * f - dx * off, size = 0.9 + rnd() * 0.25;
+        if (!onRoad(cx, cn, 1.0, r, true)) cars.push(e0 + cx, -(n0 + cn), size, heading);
         nextCar += (r.cls === 5 ? 110 : 40) * (0.4 + rnd() * 1.6);
       }
       along += len;
@@ -290,7 +376,7 @@ function buildProps(tile, e0, n0) {
     if (!Number.isFinite(cx)) continue;
     const reach = Math.sqrt(Math.abs(area)) * 0.75 + 2.5, a = rnd() * 6.283;
     const x = cx + Math.cos(a) * reach, y = cy + Math.sin(a) * reach;
-    if (inside(ring, x, y)) continue;
+    if (inside(ring, x, y) || onRoad(x, y, 1.6, null, false)) continue;
     (rnd() < 0.6 ? palms : trees).push(e0 + x, -(n0 + y), 0.7 + rnd() * 0.5, rnd() * 6.283);
   }
   return { palms: new Float32Array(palms), trees: new Float32Array(trees), cars: new Float32Array(cars) };

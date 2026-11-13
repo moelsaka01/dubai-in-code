@@ -30,13 +30,23 @@ import { createPost } from './post.js';
 //   lodFar    beyond it a tile draws only its >= 40 m buildings (the tallest-first draw range).
 //   minorFar  beyond it class >= 4 roads are hidden.
 //   plantFar  within it a tile also draws its roof plant (0 = never).
-//   props     trees, cars and boats on or off.
+//   props     palms, trees, cars and boats: a multiplier on their draw distances (0 = none).
 //   dpr       device pixel ratio cap, before the governor's scale.
-//   bloom     post pipeline with bloom, SSAO, grade and crisp sun shadows (Low renders straight to the canvas).
+//   post      the post pipeline: bloom, grade, FXAA, and with it the crisp sun shadows.
+//   ao        contact shading (SSAO) inside the post pipeline.
+//   shadowEvery  the sun shadow map is redrawn every n-th frame.
+//   treeShadows  palms and trees may cast into it.
+//
+// Low is the same picture as High with fewer pixels and less of the expensive detail, not a different renderer:
+// it keeps the light (crisp shadows, bloom at night, the grade) and gives up resolution (DPR 1), contact
+// shading, roof plant, tree shadows, distance. Before Phase 4A it rendered straight to the canvas with none
+// of that and looked like another app. If a device cannot hold even this at the governor's smallest scale,
+// govern() falls back to that bare mode (`bare` below).
 const QUALITY = {
-  high: { dpr: 1.5, bloom: true, lodFar: 7000, minorFar: 5000, plantFar: 2200, props: true },
-  low: { dpr: 1, bloom: false, lodFar: 4500, minorFar: 3000, plantFar: 0, props: false },
+  high: { dpr: 1.5, post: true, ao: true, shadowEvery: 4, treeShadows: true, lodFar: 7000, minorFar: 5000, plantFar: 2200, props: 1 },
+  low: { dpr: 1, post: true, ao: false, shadowEvery: 8, treeShadows: false, lodFar: 4500, minorFar: 3000, plantFar: 0, props: 0.35 },
 };
+const BARE_AFTER = 3; // slow windows in a row at the smallest scale before Low drops the post pipeline
 const FOV = 50;
 // Palms and trees are drawn into the sun shadow map only while its box is narrower than this (half-width, m).
 const TREE_SHADOW_HALF = 1100;
@@ -92,6 +102,7 @@ export function createApp(canvas) {
 
   // ---- quality + resize ----
   let level = 'high';
+  let bare = false, bareCount = 0; // Low on a device too slow for the post pipeline: straight to the canvas
   const res = { enabled: true, scale: 1, sum: 0, n: 0, skip: 0, fast: 0, hold: 0, climbWait: GOVERNOR.climbWaitMs, lock: 0, lockWait: GOVERNOR.lockMs, trial: null };
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
@@ -106,6 +117,8 @@ export function createApp(canvas) {
   function setQuality(next) {
     if (!QUALITY[next]) return;
     level = next;
+    bare = false;
+    bareCount = 0;
     ui.setQuality(level);
     resize();
   }
@@ -132,6 +145,9 @@ export function createApp(canvas) {
       return;
     }
     res.fast = avg < GOVERNOR.fastMs ? res.fast + GOVERNOR.windowMs : 0;
+    if (level === 'low' && !bare && avg > GOVERNOR.slowMs && res.scale <= GOVERNOR.minScale + 1e-3) {
+      if (++bareCount >= BARE_AFTER) bare = true;
+    } else bareCount = 0;
     if (avg > GOVERNOR.slowMs && res.scale > GOVERNOR.minScale && res.lock <= 0) {
       res.trial = { before: avg, from: res.scale };
       res.fast = 0;
@@ -240,27 +256,28 @@ export function createApp(canvas) {
     if (tour.playing) tour.update(dt);
     else controls.update(dt);
     const q = QUALITY[level];
+    const usePost = q.post && !bare;
     sky.update(camera);
-    // Crisp shadows near the camera (High only). Its own pass over buildings, landmarks and trees.
-    if (loaded && q.bloom) {
+    // Crisp shadows near the camera. Its own pass over buildings, landmarks, bridge decks and trees.
+    if (loaded && usePost) {
       // Palms and trees cast too, but only when the shadow box is small (camera low and close): from the air
       // their shadows are under a pixel and the pass would draw every tree in view for nothing.
-      const trees = q.props && sunShadow.half < TREE_SHADOW_HALF;
+      const trees = q.treeShadows && sunShadow.half < TREE_SHADOW_HALF;
       if (trees) props.castOnly(); // props.update() below restores the cars and boats
       const hide = [sky.object, water.object, land.object, roads.object, traffic.object, buildings.beacons.object];
       if (!trees) hide.push(props.object);
-      sunShadow.update(scene, camera, hide, buildings, [roads.casters]);
+      sunShadow.update(scene, camera, hide, buildings, [roads.casters], q.shadowEvery);
     }
     else env.uniforms.uSunOn.value = 0;
     buildings.update(camera, q.lodFar, q.plantFar);
-    props.object.visible = q.props;
-    if (q.props) props.update(camera);
+    props.object.visible = q.props > 0;
+    if (q.props > 0) props.update(camera, q.props);
     roads.update(camera, q.minorFar);
     if (traffic) traffic.update(dt);
     if (landmarks) landmarks.update(dt);
     cityMap.update();
     clouds.update();
-    post.render(env, q.bloom, dt);
+    post.render(env, usePost, dt, q.ao);
     if (perf) perf.tick(now - last0, now);
     if (tourPending) {
       tourPending = false;

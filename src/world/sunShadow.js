@@ -60,13 +60,14 @@ export function createSunShadow(renderer, env) {
      * @param {THREE.Object3D[]} hide everything that must not cast (ground, water, sky, lights)
      * @param {{ update: Function }} buildings so far tiles can drop to tall-only for this pass
      * @param {THREE.Object3D[]} show objects that exist only to cast shadows (bridge decks); visible for this pass alone
+     * @param {number} every redraw the map on every n-th call
      */
-    update(scene, camera, hide, buildings, show = []) {
+    update(scene, camera, hide, buildings, show = [], every = 4) {
       if (env.shadow <= 0) {
         env.uniforms.uSunOn.value = 0;
         return;
       }
-      if (tick++ % 4) return;
+      if (tick++ % every) return;
 
       // What the viewer is looking at: where the view ray meets the ground, kept within reach.
       camera.getWorldDirection(forward);

@@ -1,4 +1,4 @@
-// Final image. In High quality every frame goes through here:
+// Final image. Every frame goes through here, in High and in Low (Low skips step 2):
 //   1. the scene renders into one float target with a depth texture (no MSAA: 4x MSAA on a float target cost
 //      6 to 7 ms a frame at 1920x1080 on Intel Iris Xe);
 //   2. contact shading (SSAO) is computed at quarter size from the depth alone and blurred: it darkens the foot of
@@ -7,7 +7,8 @@
 //   3. when the hour calls for it, a bright-pass is blurred down and up five levels (dual filtering) for bloom;
 //   4. one full-screen pass does FXAA, applies the contact shading, adds the bloom, tone-maps (ACES), grades
 //      (contrast, cool shadows and warm highlights, vignette, grain) and writes sRGB.
-// Low quality renders straight to the canvas; every material tone-maps itself there (OUTPUT chunk).
+// Only Low on a device too slow for this renders straight to the canvas; every material tone-maps itself there
+// (OUTPUT chunk).
 import * as THREE from 'three';
 
 const LEVELS = 5;
@@ -222,10 +223,11 @@ export function createPost(renderer, scene, camera) {
     },
     /**
      * @param {{ exposure: number, bloom: number }} env
-     * @param {boolean} full true for the whole pipeline (High), false to render straight to the canvas (Low)
+     * @param {boolean} full true for the pipeline, false to render straight to the canvas
      * @param {number} dt seconds, for the grain
+     * @param {boolean} ao contact shading on or off
      */
-    render(env, full, dt = 0) {
+    render(env, full, dt = 0, ao = true) {
       renderer.toneMappingExposure = env.exposure;
       if (!full) {
         renderer.setRenderTarget(null);
@@ -245,8 +247,10 @@ export function createPost(renderer, scene, camera) {
       u.uNear.value = camera.near;
       u.uFar.value = camera.far;
       u.uProj.value.set(tan * camera.aspect, tan);
-      draw(aoMaterial, aoRT);
-      pass(blurMaterial, aoBlurRT, aoRT);
+      if (ao) {
+        draw(aoMaterial, aoRT);
+        pass(blurMaterial, aoBlurRT, aoRT);
+      }
 
       const bloom = env.bloom > 0.01;
       if (bloom) {
@@ -259,6 +263,7 @@ export function createPost(renderer, scene, camera) {
       f.tScene.value = sceneRT.texture;
       f.tBloom.value = mips[0].texture;
       f.tAO.value = aoBlurRT.texture;
+      f.uAO.value = ao ? 0.85 : 0;
       f.uPixel.value.set(1 / sceneRT.width, 1 / sceneRT.height);
       f.uStrength.value = bloom ? env.bloom * 0.6 : 0; // five summed levels, see timeOfDay.js for env.bloom
       f.uClock.value = (clock = (clock + dt) % 10);

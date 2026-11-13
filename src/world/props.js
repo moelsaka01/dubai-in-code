@@ -193,8 +193,9 @@ export function createProps(env) {
     castOnly() {
       for (const t of meshes) if (!t.casts) t.mesh.visible = false;
     },
-    update(camera) {
-      for (const t of meshes) t.mesh.visible = centre.copy(t.centre).sub(camera.position).length() - CELL * 0.71 < t.far;
+    /** @param {number} reach multiplier on the draw distances (Low quality draws nearer) */
+    update(camera, reach = 1) {
+      for (const t of meshes) t.mesh.visible = centre.copy(t.centre).sub(camera.position).length() - CELL * 0.71 < t.far * reach;
     },
   };
 }

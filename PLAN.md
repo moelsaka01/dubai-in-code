@@ -17,7 +17,7 @@ Rules for every phase: plan before coding, no screenshots unless asked (Phase 4A
 | Data source | Overpass API, raw JSON cached in `data/raw/` (gitignored) | Area is small; a Geofabrik extract would need osmium and 200 MB+. |
 | Palm scope | Whole Palm (land and buildings), not just trunk + first fronds | The whole Palm bbox holds only ~2 700 buildings, and half a palm reads as a bug. |
 | Triangulation | In the browser, in a Web Worker (`earcut`) | Shipping footprints is ~3× smaller than shipping triangles. |
-| Shadows | Sun shadows and ambient occlusion from a top-down height map of the city (`src/world/cityMap.js`), one texture fetch per fragment. No per-frame shadow pass | A 20 km scene cannot afford cascades at 60 fps on a laptop. Changed in the Phase 3 review: without shadows the city read as toy blocks. |
+| Shadows | Sun shadows and ambient occlusion from a top-down height map of the city (`src/world/cityMap.js`), one texture fetch per fragment. No per-frame shadow pass | A 20 km scene cannot afford cascades at 60 fps on a laptop. Changed in the Phase 3 review: without shadows the city read as toy blocks. | *Superseded: sun shadows now also come from a camera-fitted depth map, `src/world/sunShadow.js` (see §5 lighting pass).*
 
 Measured on 2026-11-12 (Overpass `out count`, world bbox): **100 281** building ways, 413 building relations, 1 097 `building:part` ways, **2 219 with `height` (2.2%)**, **7 636 with `building:levels` (7.6%)**, 6 375 major road ways, 9 150 minor road ways, 245 coastline ways, 197 water ways + 18 water relations.
 So about 90% of heights are estimated. That is the main quality risk (§6).
@@ -171,29 +171,29 @@ If over budget: raise the Tier B area threshold (120 → 200 → 300 m²), then 
 
 ## 3. Rendering architecture
 
-**Loading.** `manifest.json` → `land.bin` → tiles, ordered by distance to the tour's first camera position. One module worker (`src/data/tileWorker.js`) decodes a tile, triangulates roofs, builds walls and road ribbons, and transfers typed arrays back. The main thread only creates `BufferGeometry` objects.
+**Loading.** `manifest.json` → `land.bin` → tiles, ordered by distance to the tour's first camera position. One module worker (`src/data/tileWorker.js`) decodes a tile, triangulates roofs, builds walls and road ribbons, and transfers typed arrays back. The main thread only creates `BufferGeometry` objects. *Superseded: load order focuses on the start camera, or on `?cam` (see §5, Phase 4B).*
 
 **Tiles.** Each tile is two meshes: buildings and roads. That is ≤ ~70 land tiles × 2 draw calls, frustum-culled with bounding spheres from real geometry.
 
 **LOD.** The building index buffer follows the tallest-first order, so a far tile (> 7 km) calls `geometry.setDrawRange(0, tallIndexCount)` and draws only its ≥ 40 m buildings with no extra memory. Roads of class ≥ 4 hide beyond 5 km.
 
-**Building mesh.** Walls and roofs only, no floors. Vertex attributes: position, normal, `aUv` (metres along the wall, metres up), `aColor` (palette by kind + seed), `aSeed`. About 22 triangles per building, ~1.5–2 M triangles in the whole city and under 1.2 M in view.
+**Building mesh.** Walls and roofs only, no floors. Vertex attributes: position, normal, `aUv` (metres along the wall, metres up), `aColor` (palette by kind + seed), `aSeed`. About 22 triangles per building, ~1.5–2 M triangles in the whole city and under 1.2 M in view. *Superseded: crowns, podiums, tapering and pitched roofs were added in Phase 3 (see §5, review and detail passes); `aUv` has three floats.*
 
-**One building shader** (`ShaderMaterial`, shared by every tile):
+**One building shader** (`ShaderMaterial`, shared by every tile): *Superseded: windows now come in runs with interior mapping and sky reflections, lit-room logic changed at night (see §5, detail, lighting, evening and night passes).*
 - Day: sun diffuse + hemisphere ambient + fresnel sky tint on glass kinds + base AO gradient (`aUv.y < 12 m`).
 - Windows: a procedural grid from `aUv` (3.2 m floors, ~3 m bays). Per-window hash against `uLitFraction`. Warm/cool variation, some floors fully lit, dark roofs.
 - Night: window emissive × `uNight`. Fades to an averaged glow with distance, which stops aliasing shimmer.
 - Shared GLSL chunk `src/shaders/common.glsl.js` for sun, ambient, height fog and tone curve. Landmarks, roads and land use it too, so the whole scene shifts together.
 
-**Instancing.** Car lights (one `InstancedMesh` of billboards, ~1 500 instances, positions from the arc-length tables in `traffic.json`; white facing the camera, red going away). Street lights along class 0–2 roads (one `Points`). Red aviation beacons on buildings > 150 m (one `Points`). Ain Dubai capsules.
+**Instancing.** Car lights (one `InstancedMesh` of billboards, ~1 500 instances, positions from the arc-length tables in `traffic.json`; white facing the camera, red going away). Street lights along class 0–2 roads (one `Points`). Red aviation beacons on buildings > 150 m (one `Points`). Ain Dubai capsules. *Superseded: palms, trees, street cars and boats are instanced too, in 2 km cells (see §5 detail pass); street lights and beacons are in `lightPoints.js`.*
 
-**Roads.** Ribbons triangulated in the worker, width from class/lanes (SZR ≈ 2 × 22 m), at y = 1.6 m with `polygonOffset`. At night: dark asphalt with sodium-orange emissive centre lines on class 0–2. Bridges are flat in v1; where they cross the canal cut-outs they already read as bridges.
+**Roads.** Ribbons triangulated in the worker, width from class/lanes (SZR ≈ 2 × 22 m), at y = 1.6 m with `polygonOffset`. At night: dark asphalt with sodium-orange emissive centre lines on class 0–2. Bridges are flat in v1; where they cross the canal cut-outs they already read as bridges. *Superseded: drawn as pavement casing plus carriageway, with raised bridges (see §5 lighting pass).*
 
-**Ground and sea.** Land is extruded 1.5 m with a vertical quay skirt, sand coloured with slight noise, plus green and beach patches at +0.05 m. The sea is one 80 km plane at y = 0.
+**Ground and sea.** Land is extruded 1.5 m with a vertical quay skirt, sand coloured with slight noise, plus green and beach patches at +0.05 m. The sea is one 80 km plane at y = 0. *Superseded: draw order is by `renderOrder` and the sea is drawn last (see §5, "Draw order replaces small y gaps" and the review pass).*
 
-**Water shader** (`src/world/water.js`): analytic normals from 4 scrolling sine sets plus one fbm octave, fresnel mix of deep colour and the analytic sky colour, sun or moon glint, distance fade to the horizon colour. Phase 4 adds a shore mask: render the land once top-down into a 2048² texture and blur it, which gives turquoise shallows, foam, and at night the city's glow on the water.
+**Water shader** (`src/world/water.js`): analytic normals from 4 scrolling sine sets plus one fbm octave, fresnel mix of deep colour and the analytic sky colour, sun or moon glint, distance fade to the horizon colour. Phase 4 adds a shore mask: render the land once top-down into a 2048² texture and blur it, which gives turquoise shallows, foam, and at night the city's glow on the water. *Superseded: the shore mask and noise-based normals were built in the review pass (see §5).*
 
-**Sky and time of day** (`src/env/timeOfDay.js`). One parameter `t ∈ [0,1]`, keyframed and interpolated into a single `env` object that every material reads:
+**Sky and time of day** (`src/env/timeOfDay.js`). One parameter `t ∈ [0,1]`, keyframed and interpolated into a single `env` object that every material reads: *Superseded: post is `src/post.js` with FXAA, SSAO and grade; bloom strength is 0.12 to 0.4 (threshold 1.0); evening sky and lighting changed in the evening and night pass (see §5).*
 
 | t | Moment | Sun | Look |
 |---|---|---|---|
@@ -204,11 +204,11 @@ If over budget: raise the Tier B area threshold (120 → 200 → 300 m²), then 
 
 Sky dome shader: zenith/horizon gradient, sun disc and glow, stars, city-glow band. Renderer: ACES tone mapping, exposure from `env`. Post: own bloom chain at half resolution plus FXAA in one final pass (`src/post.js`, see the review notes in §5), strength from `env.bloom`. Fog is exponential height fog in the shared chunk (Dubai haze is authentic and hides the world edge).
 
-**Camera.** `src/camera/tour.js`: Catmull-Rom splines through position and look-at keyframes, ~40 s, eased. The tour also drives `t` from golden hour to night, so it lands on the night skyline. Route: offshore of Bluewaters (Ain Dubai + JBR) → along the Marina canal past Cayan Tower → climb over the Palm trunk toward Atlantis → down the coast past Burj Al Arab → along Sheikh Zayed Road → rising orbit of Burj Khalifa from the fountain lake. Any input skips it. `src/camera/controls.js`: `OrbitControls` with damping, a ground clamp, and WASD/arrow keys to fly the target.
+**Camera.** `src/camera/tour.js`: Catmull-Rom splines through position and look-at keyframes, ~40 s, eased. The tour also drives `t` from golden hour to night, so it lands on the night skyline. Route: offshore of Bluewaters (Ain Dubai + JBR) → along the Marina canal past Cayan Tower → climb over the Palm trunk toward Atlantis → down the coast past Burj Al Arab → along Sheikh Zayed Road → rising orbit of Burj Khalifa from the fountain lake. Any input skips it. `src/camera/controls.js`: `OrbitControls` with damping, a ground clamp, and WASD/arrow keys to fly the target. *Superseded: the tour runs 54 s, not ~40 s (see §5, Phase 3 notes).*
 
 **UI** (`src/ui/`): plain HTML/CSS overlay with title, time slider, Tour button, quality toggle (Low / High), landmark jump chips, loading bar, and an always-visible "© OpenStreetMap contributors" link to `openstreetmap.org/copyright`.
 
-**Frame budget (mid-range laptop, 1080p):** ≤ 250 draw calls, ≤ 1.2 M triangles in view, device pixel ratio capped at 1.5, bloom half-res, `near = 5`, `far = 60 000`. If the frame time stays above 20 ms for 2 s, drop to Low automatically (DPR 1, no bloom, tighter LOD).
+**Frame budget (mid-range laptop, 1080p):** ≤ 250 draw calls, ≤ 1.2 M triangles in view, device pixel ratio capped at 1.5, bloom half-res, `near = 5`, `far = 60 000`. If the frame time stays above 20 ms for 2 s, drop to Low automatically (DPR 1, no bloom, tighter LOD). *Superseded: the auto drop to Low is a resolution governor (`govern()` in `src/app.js`; see §5 review pass).*
 
 ---
 
@@ -218,10 +218,10 @@ Each module exports `create(env) → { group, update(dt, env) }`, is built aroun
 
 | Landmark | Approach |
 |---|---|
-| **Burj Khalifa** (828 m) | Y-plan: hexagonal core + 3 wings at 120°, each a rounded-nose shape ~72 m long and ~24 m wide at the base. 27 setbacks in a spiral: setback *k* shortens wing `k mod 3` at height `h_k` (spaced so the tiers thin toward the top, last wing tier at ~600 m). For each height band, build the 2D union outline of core + current wings and extrude it: ~27 stacked prisms. Above that, a 3-step telescoping spire to 828 m. Shader: silver-blue glass with fine vertical fins. Night: cool white facade shimmer, spire beacon. |
-| **Burj Al Arab** (321 m) | Loft: 40 height slices × 24 section points. The section is a V-shaped wedge (two wings from a mast). Its depth follows a sail curve: a Bézier from the base, bulging at about one third of the height, tapering to the mast top. Add the mast (thin cylinder to 321 m), two curved exoskeleton tubes following the bow, the helipad disc at 210 m on a short cantilever, and a white fabric face between the wings. The island and bridge come from OSM land. Night: slow colour-cycling emissive on the fabric face. |
+| **Burj Khalifa** (828 m) | Y-plan: hexagonal core + 3 wings at 120°, each a rounded-nose shape ~72 m long and ~24 m wide at the base. 27 setbacks in a spiral: setback *k* shortens wing `k mod 3` at height `h_k` (spaced so the tiers thin toward the top, last wing tier at ~600 m). For each height band, build the 2D union outline of core + current wings and extrude it: ~27 stacked prisms. Above that, a 3-step telescoping spire to 828 m. Shader: silver-blue glass with fine vertical fins. Night: cool white facade shimmer, spire beacon. | *Superseded: placed from the raw OSM outline, not `landmarks.json` (see §5).*
+| **Burj Al Arab** (321 m) | Loft: 40 height slices × 24 section points. The section is a V-shaped wedge (two wings from a mast). Its depth follows a sail curve: a Bézier from the base, bulging at about one third of the height, tapering to the mast top. Add the mast (thin cylinder to 321 m), two curved exoskeleton tubes following the bow, the helipad disc at 210 m on a short cantilever, and a white fabric face between the wings. The island and bridge come from OSM land. Night: slow colour-cycling emissive on the fabric face. | *Superseded: placed from the raw OSM outline, not `landmarks.json` (see §5).*
 | **Cayan Tower** (306 m) | Loft of 75 rings, each the chamfered-rectangle footprint (~36 × 30 m, or the OSM outline) rotated by 1.2° more than the one below: 90° total. Shared vertices between rings give the smooth helix. The shader draws floor bands and the corner columns as helical lines from UVs. |
-| **Museum of the Future** (77 m) | Parametric surface: an elliptical ring standing upright (centre curve ~28 m × 30 m semi-axes) swept with a varying elliptical cross-section, thicker at the base, with the oval void slightly off-centre. Sits on a squashed green mound ~15 m high. Shader: brushed steel with strong fresnel sky reflection, and flowing calligraphy-like strokes from domain-warped bands that glow white at night. |
+| **Museum of the Future** (77 m) | Parametric surface: an elliptical ring standing upright (centre curve ~28 m × 30 m semi-axes) swept with a varying elliptical cross-section, thicker at the base, with the oval void slightly off-centre. Sits on a squashed green mound ~15 m high. Shader: brushed steel with strong fresnel sky reflection, and flowing calligraphy-like strokes from domain-warped bands that glow white at night. | *Superseded: rebuilt in the review pass (see §5).*
 | **Ain Dubai** (250 m) | Rim `TorusGeometry` (radius ~118 m), 48 instanced capsules, spokes as `LineSegments` from hub to rim, hub cylinder at ~126 m, four tapered legs in two A-frames. Slow rotation in `update`. Night: animated LED pattern on the rim. |
 
 Stretch, Phase 4 only if budget allows: Dubai Fountain jets (instanced particles on the Burj lake at night), Atlantis arch, Metro viaduct from the rail ways.

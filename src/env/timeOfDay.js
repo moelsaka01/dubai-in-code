@@ -14,14 +14,17 @@ const KEYS = [
     ambSky: L(0.16, 0.21, 0.3), ambGround: L(0.17, 0.15, 0.1), water: S(0x0c6a80), fog: 5.0e-5, exposure: 0.78, night: 0, lit: 0, bloom: 0, stars: 0 },
   { t: 0.3, el: 33, az: 255, zenith: S(0x2f68b8), horizon: S(0xc4d4de), glow: S(0xffe2b0, 0.25), sun: L(0.82, 0.76, 0.64),
     ambSky: L(0.15, 0.19, 0.28), ambGround: L(0.16, 0.13, 0.09), water: S(0x0d6078), fog: 6.0e-5, exposure: 0.82, night: 0, lit: 0.02, bloom: 0, stars: 0 },
-  { t: 0.5, el: 8, az: 285, zenith: S(0x3d6aa6), horizon: S(0xf2b274), glow: S(0xff9a40, 0.9), sun: L(0.95, 0.59, 0.28),
-    ambSky: L(0.11, 0.13, 0.2), ambGround: L(0.13, 0.09, 0.06), water: S(0x1d5068), fog: 8.0e-5, exposure: 0.95, night: 0.1, lit: 0.2, bloom: 0.12, stars: 0 },
-  { t: 0.64, el: 0, az: 291, zenith: S(0x2a447e), horizon: S(0xee8a50), glow: S(0xff6a30, 1.0), sun: L(0.5, 0.21, 0.08),
-    ambSky: L(0.075, 0.09, 0.15), ambGround: L(0.08, 0.055, 0.045), water: S(0x1a3a58), fog: 8.0e-5, exposure: 1.05, night: 0.45, lit: 0.45, bloom: 0.2, stars: 0 },
+  // Golden hour and sunset: a strong warm sun against a cool, dim sky fill. The contrast between the two is what
+  // gives the evening its definition; with a warm fill everything turns one shade of orange.
+  { t: 0.5, el: 8, az: 285, zenith: S(0x3d6aa6), horizon: S(0xf2b274), glow: S(0xff9a40, 0.9), sun: L(1.3, 0.76, 0.36),
+    ambSky: L(0.08, 0.11, 0.19), ambGround: L(0.085, 0.07, 0.055), water: S(0x1d5068), fog: 5.5e-5, exposure: 0.92, night: 0.05, lit: 0.04, bloom: 0.14, stars: 0 },
+  { t: 0.64, el: 2.5, az: 291, zenith: S(0x2a447e), horizon: S(0xee8a50), glow: S(0xff6a30, 1.0), sun: L(1.05, 0.46, 0.19),
+    ambSky: L(0.055, 0.075, 0.145), ambGround: L(0.06, 0.045, 0.04), water: S(0x1a3a58), fog: 6.0e-5, exposure: 1.05, night: 0.35, lit: 0.22, bloom: 0.2, stars: 0 },
   { t: 0.75, el: -6, az: 296, zenith: S(0x0e1c44), horizon: S(0x5a4f78), glow: S(0xff5a30, 0.45), sun: L(0.3, 0.12, 0.05),
-    ambSky: L(0.04, 0.055, 0.11), ambGround: L(0.04, 0.032, 0.03), water: S(0x0a1a38), fog: 7.0e-5, exposure: 1.1, night: 0.8, lit: 0.6, bloom: 0.32, stars: 0.25 },
-  { t: 1.0, el: -30, az: 310, zenith: S(0x060a16), horizon: S(0x3a2618), glow: S(0x000000), sun: L(0, 0, 0),
-    ambSky: L(0.022, 0.028, 0.045), ambGround: L(0.04, 0.03, 0.02), water: S(0x03080f), fog: 6.0e-5, exposure: 1.15, night: 1, lit: 0.7, bloom: 0.4, stars: 1 },
+    ambSky: L(0.04, 0.055, 0.11), ambGround: L(0.04, 0.032, 0.03), water: S(0x0a1a38), fog: 7.0e-5, exposure: 1.1, night: 0.8, lit: 0.45, bloom: 0.32, stars: 0.25 },
+  // Night: the haze over the city is lit from below, so the horizon is a dull amber and distance fades into it.
+  { t: 1.0, el: -30, az: 310, zenith: S(0x060a16), horizon: S(0x54361f), glow: S(0x000000), sun: L(0, 0, 0),
+    ambSky: L(0.028, 0.036, 0.058), ambGround: L(0.06, 0.042, 0.026), water: S(0x03080f), fog: 8.0e-5, exposure: 1.15, night: 1, lit: 0.55, bloom: 0.42, stars: 1 },
 ];
 const SCALARS = ['el', 'az', 'fog', 'exposure', 'night', 'lit', 'bloom', 'stars'];
 const COLORS = ['zenith', 'horizon', 'glow', 'sun', 'ambSky', 'ambGround', 'water'];
@@ -123,7 +126,7 @@ export function createEnv() {
       uniforms.uLitFraction.value = cur.lit;
       uniforms.uStars.value = cur.stars;
       // Shadows fade out as the sun reaches the horizon; the moon casts none.
-      env.shadow = smooth(0.5, 5, cur.el);
+      env.shadow = smooth(0, 3, cur.el);
       env.sunElevation = cur.el;
       env.night = cur.night;
       env.exposure = cur.exposure;

@@ -132,11 +132,12 @@ export function createPost(renderer, scene, camera) {
       }
 
       // FXAA (Timothy Lottes), the compact nine-tap form.
-      vec3 fxaa(vec2 uv) {
+      vec3 fxaa(vec2 uv, out vec3 around) {
         const vec3 W = vec3(0.299, 0.587, 0.114);
         vec3 nw = tap(uv + vec2(-1.0, -1.0) * uPixel), ne = tap(uv + vec2(1.0, -1.0) * uPixel);
         vec3 sw = tap(uv + vec2(-1.0, 1.0) * uPixel), se = tap(uv + vec2(1.0, 1.0) * uPixel);
         vec3 m = tap(uv);
+        around = (nw + ne + sw + se) * 0.25;
         float lnw = dot(nw, W), lne = dot(ne, W), lsw = dot(sw, W), lse = dot(se, W), lm = dot(m, W);
         float lmin = min(lm, min(min(lnw, lne), min(lsw, lse)));
         float lmax = max(lm, max(max(lnw, lne), max(lsw, lse)));
@@ -150,7 +151,10 @@ export function createPost(renderer, scene, camera) {
       }
 
       void main() {
-        vec3 c = fxaa(vUv);
+        vec3 around;
+        vec3 c = fxaa(vUv, around);
+        // Unsharp mask from the same four taps: FXAA and upscaling soften the frame, this puts the edges back.
+        c = max(c + (c - around) * 0.55, 0.0);
         c = c / max(1.0 - max(c.r, max(c.g, c.b)), 0.02); // back to scene-linear
         c *= mix(1.0, texture2D(tAO, vUv).r, uAO);
         c += texture2D(tBloom, vUv).rgb * uStrength;

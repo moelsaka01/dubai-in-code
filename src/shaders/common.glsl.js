@@ -69,17 +69,21 @@ float vnoise(vec2 p) {
 vec3 skyColor(vec3 d) {
   float h = max(d.y, 0.0);
   float k = mix(3.5, 9.0, uNight);
-  vec3 c = mix(uSkyZenith, uSkyHorizon, exp(-h * k));
+  // With the sun low, the horizon is only orange toward it; the far side of the sky is cool and dimmer. The fog
+  // takes its colour from here too, so haze and reflections stop being one colour in every direction.
+  float toward = dot(normalize(d.xz + 1e-5), normalize(uSunDir.xz + 1e-5)) * 0.5 + 0.5;
+  float low = (1.0 - smoothstep(0.15, 0.7, uSunDir.y)) * (1.0 - uNight);
+  vec3 horizon = mix(uSkyHorizon, mix(uSkyHorizon, uSkyZenith, 0.6) * 0.85, low * (1.0 - toward * toward));
+  vec3 c = mix(uSkyZenith, horizon, exp(-h * k));
   float s = max(dot(d, uSunDir), 0.0);
-  float low = exp(-h * 5.0);
-  c += uSkyGlow * (0.55 * pow(s, 5.0) * low + 0.45 * pow(s, 48.0));
+  c += uSkyGlow * (0.55 * pow(s, 5.0) * exp(-h * 5.0) + 0.45 * pow(s, 48.0));
   return c;
 }
 
 // High thin cloud: how much of it lies in direction d, and its colour. Shared by the dome and by reflections.
 float cloudCover(vec3 d) {
   vec2 cp = d.xz / (max(d.y, 0.0) + 0.12) * 1.6;
-  return texture2D(uCloudMap, cp / 24.0 + 0.5).r * smoothstep(0.02, 0.25, d.y) * mix(0.55, 0.3, uNight);
+  return texture2D(uCloudMap, cp / 24.0 + 0.5).r * smoothstep(0.02, 0.25, d.y) * mix(0.55, 0.04, uNight);
 }
 
 vec3 cloudColor(vec3 d) {

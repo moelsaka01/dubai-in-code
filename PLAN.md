@@ -363,15 +363,15 @@ Do not touch the UI, the URL handling or index.html: those belong to Phase 4B. I
 
 Plain engineering with clear answers. The no-screenshots rule stands here: check with the console, the DOM and `npm run check`. Do not change how anything is lit, shaded or shaped: `src/shaders/`, `src/world/`, `src/landmarks/`, `src/data/buildingMesh.js` and `src/post.js` are off limits except to read.
 
-- [ ] 4B.1 `?perf` overlay: draw calls, triangles, frame time (smoothed), render scale and quality level, read from `window.__dubai.stats()` and `.res`. Then record those numbers at five fixed camera spots (tour seconds 0, 9, 27, 44, 54) in `BUILD_LOG.md`. Touches: `src/ui/`, `src/app.js`.
-- [ ] 4B.2 URL parameters: `?t=0..1` (time of day), `?cam=x,y,z,tx,ty,tz` (camera and target in scene metres), `?notour`, `?q=low|high`. A parameter that sets the view also skips the tour. Touches: `src/app.js`, a small `src/ui/params.js`.
-- [ ] 4B.3 `H` hides the overlay for recording. The OSM credit (`#credit`) stays visible in every state.
-- [ ] 4B.4 A clear message when WebGL 2 is not available, and when a data file fails to load (the status line already reports the count; make sure the page is not left blank). Loading: the bar exists; keep the tour from starting before the first frame with the city in it.
-- [ ] 4B.5 Phones and touch: start in Low on a coarse pointer or a narrow screen, check the panel and chips at 360 px wide, make sure one-finger orbit and pinch zoom work and that scrolling the page does not skip the tour. Respect `prefers-reduced-motion`: no automatic tour.
-- [ ] 4B.6 Put the LOD distances and the governor's constants in one commented block at the top of `src/app.js` (they are spread over `QUALITY`, `src/world/props.js` and `src/world/sunShadow.js`); do not change their values.
-- [ ] 4B.7 Housekeeping: commit `.claude/launch.json` or ignore `.claude/` (ask which); delete the empty `.gitkeep` files in folders that now have code; add "run it" and "check it" lines to `README.md`; add Sonnet 5.5 prices to `PRICES` in `scripts/usage.mjs` (look them up) and fill the Phase 2 cost in `BUILD_LOG.md`.
-- [ ] 4B.8 §3 and §4 of this file describe the first design. Do not rewrite them; add a one-line "superseded, see §5" note to each paragraph that the Phase 3 notes overrule (post-processing, shadows, water draw order, bloom strengths, tour length).
-- [ ] 4B.9 Update `BUILD_LOG.md` and tick these boxes.
+- [x] 4B.1 `?perf` overlay: draw calls, triangles, frame time (smoothed), render scale and quality level, read from `window.__dubai.stats()` and `.res`. Then record those numbers at five fixed camera spots (tour seconds 0, 9, 27, 44, 54) in `BUILD_LOG.md`. Touches: `src/ui/`, `src/app.js`.
+- [x] 4B.2 URL parameters: `?t=0..1` (time of day), `?cam=x,y,z,tx,ty,tz` (camera and target in scene metres), `?notour`, `?q=low|high`. A parameter that sets the view also skips the tour. Touches: `src/app.js`, a small `src/ui/params.js`.
+- [x] 4B.3 `H` hides the overlay for recording. The OSM credit (`#credit`) stays visible in every state.
+- [x] 4B.4 A clear message when WebGL 2 is not available, and when a data file fails to load (the status line already reports the count; make sure the page is not left blank). Loading: the bar exists; keep the tour from starting before the first frame with the city in it.
+- [x] 4B.5 Phones and touch: start in Low on a coarse pointer or a narrow screen, check the panel and chips at 360 px wide, make sure one-finger orbit and pinch zoom work and that scrolling the page does not skip the tour. Respect `prefers-reduced-motion`: no automatic tour.
+- [x] 4B.6 Put the LOD distances and the governor's constants in one commented block at the top of `src/app.js` (they are spread over `QUALITY`, `src/world/props.js` and `src/world/sunShadow.js`); do not change their values.
+- [x] 4B.7 Housekeeping: commit `.claude/launch.json` or ignore `.claude/` (ask which); delete the empty `.gitkeep` files in folders that now have code; add "run it" and "check it" lines to `README.md`; add Sonnet 5.5 prices to `PRICES` in `scripts/usage.mjs` (look them up) and fill the Phase 2 cost in `BUILD_LOG.md`.
+- [x] 4B.8 §3 and §4 of this file describe the first design. Do not rewrite them; add a one-line "superseded, see §5" note to each paragraph that the Phase 3 notes overrule (post-processing, shadows, water draw order, bloom strengths, tour length).
+- [x] 4B.9 Update `BUILD_LOG.md` and tick these boxes.
 
 Prompt for the chat (Sonnet 5.5):
 

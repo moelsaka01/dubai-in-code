@@ -35,7 +35,7 @@ The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them again
 | 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
 | 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | $3.60 |
 | 3 Rendering and landmarks, with four review passes (v0.1.0) | Fable 5.2 | 9 | ~19 h wall clock | 322 | 526,491 | 73,094,893 | 2,671,274 | ~$122.28 |
-| 4B Small fixes | Sonnet 5.5 | | | | | | | |
+| 4B Small fixes | Sonnet 5.5 | 1 | ~10 min | see `npm run usage` | | | | ~$1.5 (in progress) |
 | 4A Visual bugs | Fable 5.2 | | | | | | | |
 | 5 README, deploy, launch | | | | | | | | |
 | **Total** | | | | | | | | |
@@ -195,3 +195,15 @@ Reference numbers at the five fixed tour spots (tour seconds 0, 9, 27, 44, 54), 
 | 54 | 1.00 | 193 | 1 029 K | 87.9 | 1.00 |
 
 Re-measure on the owner's laptop with `?perf` before comparing anything in Phase 4A.
+
+### 4B.2 to 4B.8 summary
+
+- **URL parameters** (`src/ui/params.js`): `t`, `cam`, `notour`, `q`, `perf`. Bad values are ignored; `t` or `cam` skips the tour; tiles load nearest to the `cam` position. OrbitControls clamps a very shallow `cam` upward (polar angle limit), so the camera y can end a little above what was typed.
+- **H** hides title, chips, panel and the perf readout (class `hud-hidden` on body). The tour keeps playing; `#credit` is not in the rule.
+- **Failures** (`src/ui/fatal.js`): no WebGL 2, a failed start, a failed manifest or every data file failing each show a full-page message instead of a blank page. Some tiles failing still shows the city and reports the count. The tour now starts at the end of the first frame rendered with the city loaded.
+- **Phones:** Low on a coarse pointer or a screen under 600 px; `?q` overrides. No automatic tour with `prefers-reduced-motion` (the Play button still works). 360 px wide: no horizontal overflow, panel and chips do not overlap; the perf readout moves under the chips. `overscroll-behavior: none`. Touch orbit and pinch are OrbitControls defaults and `touch-action: none` is on the canvas; not tried on a real touch device.
+- **Constants:** `QUALITY` and a new `GOVERNOR` block at the top of `src/app.js`, same values. The `props.js` and `sunShadow.js` numbers are described there, not moved, because `src/world/` is off limits in 4B.
+- **Housekeeping:** `.gitkeep` files removed, README has run and check lines, Sonnet 5.5 added to `PRICES` ($2 / $10, from third-party trackers; Anthropic's page was not reachable), Phase 2 cost $3.60. `.claude/` is still untracked, waiting for the owner's answer.
+- **PLAN.md:** 14 "Superseded" notes in §3 and §4.
+
+**Process slip:** another session was editing `src/shaders/building.glsl.js` in the same checkout. My `git add src` in 4B.5 and `git add -A` in 4B.7 swept its work-in-progress into those two commits. The file is still modified in the working tree.

@@ -11,8 +11,10 @@ import os from 'node:os';
 import path from 'node:path';
 
 // $ per million tokens: [input, output]. Add other models before the final cost table (PLAN.md task 5.3).
-// Sonnet 5.5: $2 / $10 per Anthropic's list price as reported by third-party trackers on 2026-11-13 (not read from Anthropic's own page; re-check in Phase 5).
+// Sonnet 5.5: $2 / $10, cache read $0.10 (since 2026-10-07; was $0.20), 5m write $2.50, 1h write $4, per Anthropic's pricing docs (checked 2026-11-14).
 const PRICES = { 'claude-fable-5-2': [8, 40], 'claude-sonnet-5-5': [2, 10] };
+// Cache-read price as a multiple of the input price, where it differs from CACHE_READ.
+const CACHE_READ_BY_MODEL = { 'claude-sonnet-5-5': 0.05 };
 // Assumed cache multipliers on the input price. Check current pricing before publishing a number.
 const CACHE_READ = 0.1;
 const CACHE_WRITE_5M = 1.25;
@@ -82,7 +84,7 @@ for (const file of files) {
     const price = PRICES[model];
     let cost = 'price not set';
     if (price) {
-      const usd = (t.input * price[0] + t.output * price[1] + t.cacheRead * price[0] * CACHE_READ + t.cacheWriteCost * price[0]) / 1e6;
+      const usd = (t.input * price[0] + t.output * price[1] + t.cacheRead * price[0] * (CACHE_READ_BY_MODEL[model] ?? CACHE_READ) + t.cacheWriteCost * price[0]) / 1e6;
       grand += usd;
       cost = `$${usd.toFixed(2)}`;
     }

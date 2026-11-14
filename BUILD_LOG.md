@@ -24,23 +24,25 @@ API-equivalent cost = input × P_in + output × P_out + cache read × 0.1 × P_i
 | Model | Input $/M | Output $/M | Source |
 |---|---|---|---|
 | Claude Fable 5.2 | 8 | 40 | given in the project brief |
-| Claude Sonnet 5.5 | 2 | 10 | third-party price trackers, 2026-11-13 (Anthropic's own page could not be opened); cache read $0.20, 5-minute write $2.50, 1-hour write $4 per M are in line with the script's multipliers. Re-check in Phase 5 |
+| Claude Sonnet 5.5 | 2 | 10 | Anthropic pricing docs, checked 2026-11-14: cache read $0.10 per M (cut from $0.20 on 2026-10-07, so 0.05 x input), 5-minute write $2.50, 1-hour write $4 |
 
-The cache multipliers are assumptions in `scripts/usage.mjs`. Confirm them against current pricing in Phase 5 before publishing a number. Most of the token volume is cache reads, so they matter.
+Cache multipliers live in `scripts/usage.mjs`. Sonnet 5.5's are confirmed above. **Fable 5.2's cache rates were not found** and still use the standard 0.1 / 1.25 / 2 multipliers; cache reads are most of its volume, so treat the Fable figures as an estimate until checked against the pricing page.
 
 ## Phases
 
 | Phase | Model | Prompts | Time | Input | Output | Cache read | Cache write | API-equivalent |
 |---|---|---|---|---|---|---|---|---|
 | 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
-| 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | $3.60 |
-| 3 Rendering and landmarks, with four review passes (v0.1.0) | Fable 5.2 | 9 | ~19 h wall clock | 322 | 526,491 | 73,094,893 | 2,671,274 | ~$122.28 |
-| 4B Small fixes | Sonnet 5.5 | 1 | ~10 min | see `npm run usage` | | | | ~$1.5 (in progress) |
-| 4A Visual bugs | Fable 5.2 | | | | | | | |
-| 5 README, deploy, launch | | | | | | | | |
-| **Total** | | | | | | | | |
+| 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | $2.93 |
+| 3 Rendering and landmarks, with four review passes (v0.1.0) | Fable 5.2 | 9 | ~19 h wall clock | 332 | 540,523 | 77,123,002 | 2,689,225 | $126.35 |
+| 4B Small fixes | Sonnet 5.5 | 2 | ~824 min wall clock (idle gaps) | 98 | 29,510 | 5,763,371 | 215,162 | $1.73 |
+| 4A Visual bugs | Fable 5.2 | 3 | ~823 min wall clock (idle gaps) | 214 | 134,479 | 29,234,807 | 828,092 | $42.02 |
+| 5 README, deploy, launch | Sonnet 5.5 | 1 | | 14 | 2,054 | 637,404 | 68,060 | $0.36 so far |
+| **Total** | | 25 | | | | | | **$178.69** |
 
-Phases 1 and 2 are final figures, read on 2026-11-12 during Phase 3. Phase 3 (including its review pass) was measured from inside its own session just before the last commit, so it misses the final turns. Re-run `npm run usage` for the exact number.
+Re-read on 2026-11-14 with `npm run usage`; these supersede earlier figures (Phase 2 fell from $3.60 to $2.93 because Sonnet's cache-read rate is $0.10, not $0.20). Phase 5 was measured from inside its own session and misses its last turns.
+
+**Headline:** about **$179** at API-equivalent prices for the whole project (Fable 5.2 $173.68, Sonnet 5.5 $5.02), 25 prompts over three days. Phase 3, with its four rounds of "it looks fake", was 70% of it. This is what the same tokens would cost through the API, not what was paid on a subscription.
 
 ### Phase 1 — plan and skeleton (2026-11-12)
 
@@ -256,3 +258,9 @@ No slower within the noise (about ±1.5 ms between readings of the same code). T
 - Shadows beyond the box are still the soft height-map ones.
 - Burj Khalifa close up at night shows lit rooms as a grid of squares.
 - Low's new cost has only been measured on this machine's GPU; phones are untested.
+
+## Phase 5 — README, deploy, launch (Sonnet 5.5, 2026-11-14)
+
+**Done:** README (what it is, how it was built, run, check, rebuild data, deploy, ODbL notice), `.github/workflows/deploy.yml` (check, build, publish `dist/` to GitHub Pages on push to `main` or `master`), the cost table above, `LAUNCH.md`.
+
+**Not done / needs the owner:** the repository has no remote, so the workflow has never run. Create the GitHub repo, push, and set Pages > Source to "GitHub Actions". The branch is `master` and the plan says `main`; the workflow accepts both. Fable 5.2 cache prices are unconfirmed (see Cost method). The clip in `LAUNCH.md` still has to be recorded.

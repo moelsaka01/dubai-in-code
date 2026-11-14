@@ -343,7 +343,7 @@ What the owner has said, in order: it lagged; it looked like Lego; everything ex
 - [x] 4A.4 Shadows. Sharp only inside the box around the camera, soft beyond it; look at the seam. Trees and bridge decks cast none. Check for striping on walls at low sun. `src/world/sunShadow.js`, `sunLight()` in `src/shaders/common.glsl.js`.
 - [x] 4A.5 Landmarks by day. Burj Khalifa is plain from far away. The Museum of the Future's proportions and script. Cayan's twist does not read from its chip view. Dubai Mall is one flat slab beside Burj Khalifa.
 - [x] 4A.6 Tour framing and timing (54 s). Look at every keyframe at the time of day the tour reaches it. `src/camera/tour.js`; `npm run check` guards clearance.
-- [x] 4A.7 Low quality has no crisp shadows, contact shading, bloom or grade, so it looks like a different app. Decide what it keeps. Taken without the owner: Low keeps shadows, bloom and grade, drops contact shading, pixels and distance (`QUALITY` in `src/app.js`). Confirm or change.
+- [x] 4A.7 Low quality has no crisp shadows, contact shading, bloom or grade, so it looks like a different app. Decide what it keeps. Decided: Low keeps shadows, bloom and grade, drops contact shading, pixels and distance (`QUALITY` in `src/app.js`). Taken while the owner was away, confirmed by them on 2026-11-14.
 - [x] 4A.8 Stretch, only if the rest is done: Dubai Fountain on the Burj lake at night, Atlantis arch, Metro viaduct. Done: the fountain. Not done: Atlantis arch, Metro piers (rail bridges were raised in 4A.3).
 - [x] 4A.9 Update `BUILD_LOG.md` (what the screenshots showed, what changed, frame time back to back) and tick these boxes.
 

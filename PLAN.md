@@ -386,10 +386,10 @@ Where a task says "ask", ask me once and carry on with the next task meanwhile. 
 ```
 
 ### Phase 5 — README, deploy, launch
-- [ ] 5.1 `README.md`: what it is, how it was built, how to reproduce the data, credits, ODbL notice
-- [ ] 5.2 `.github/workflows/deploy.yml` for GitHub Pages (Vite `base: './'` is already set), or Vercel
-- [ ] 5.3 Final cost table in `BUILD_LOG.md`: tokens per phase × Fable 5.2 ($8 in / $40 out per M) and Sonnet 5.5 rates (look up current pricing, including cache read/write rates)
-- [ ] 5.4 Launch post draft with the headline number, a short clip or GIF plan, `LAUNCH.md`
+- [x] 5.1 `README.md`: what it is, how it was built, how to reproduce the data, credits, ODbL notice
+- [x] 5.2 `.github/workflows/deploy.yml` for GitHub Pages (Vite `base: './'` is already set), or Vercel
+- [x] 5.3 Final cost table in `BUILD_LOG.md`: tokens per phase × Fable 5.2 ($8 in / $40 out per M) and Sonnet 5.5 rates (look up current pricing, including cache read/write rates)
+- [x] 5.4 Launch post draft with the headline number, a short clip or GIF plan, `LAUNCH.md`
 
 ---
 

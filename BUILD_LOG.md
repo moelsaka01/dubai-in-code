@@ -207,3 +207,52 @@ Re-measure on the owner's laptop with `?perf` before comparing anything in Phase
 - **PLAN.md:** 14 "Superseded" notes in §3 and §4.
 
 **Process slip:** another session was editing `src/shaders/building.glsl.js` in the same checkout. My `git add src` in 4B.5 and `git add -A` in 4B.7 swept its work-in-progress into those two commits. The file is still modified in the working tree.
+
+## Phase 4A — visual bugs (Fable 5.2, 2026-11-13 to 14)
+
+Judged by eye this time. Every change was looked at in the preview pane at t = 0.3, 0.5, 0.64, 0.75 and 1.0, from the air over the Marina and from street level by Cayan Tower, plus the view each task needed.
+
+**What the first screenshots showed, before any change:**
+- Night from the air: fat white rectangles on black towers, like a QR code. Close up the runs worked but were near-white, and the walls between them were pure black.
+- Night sky: a flat brown band over the lower half of the sky in every direction.
+- Tower crowns: the same thin white outline on every tier top.
+- Day from the air: every tower the same pale blue. Burj Khalifa a beige spike.
+- Roads: junctions were flat grey blobs, ramps lay on the sand, palms stood in carriageways.
+- Cayan: a uniform grid by day, a white checkerboard by night.
+
+**What changed, task by task:**
+- **4A.1 Night from the air.** The 6-bay by 2-floor blocks were a second, coarser pattern. Now one function draws the lit runs at every distance: under a pixel per bay a run is a dash one floor high, under a pixel per floor it blends with the next floor, beyond that the wall takes the mean. Runs are shorter (1 to 3 bays for flats, 3 to 10 for offices), most are dim and a few bright, lamp colours are warmer, and facades take a faint fill from the sky glow.
+- **4A.2 Tower lighting.** About half the tall towers carry one of four schemes (tier lines, corner LED strips, a washed crown, podium floodlights) in white, amber, blue or teal. Burj Khalifa: each setback lights the tier above it. Cayan and Burj Al Arab: rooms in runs. Museum script 40% dimmer. The night horizon glow is tighter and less brown.
+- **4A.3 Roads in three dimensions.** `scripts/build-bridges.mjs` reads the shipped tiles and writes `public/data/bridges.json` (4.6 KB): for every point where bridge ways meet, the distance along bridges to the ground. 413 raised ways, 139 joints. Decks now join across tiles and between ways without steps; motorway bridges and rail bridges (the Palm monorail) rise too, motorway traffic follows the deck, and decks stand on piers placed clear of the roads below. Palms are refused where they would stand within 1.6 m of another road (34,479 down to 25,396), cars where they would stand under a deck.
+- **4A.4 Shadows.** Decks, piers, and (when the shadow box is under 1100 m half-width) palms and trees are drawn into the sun shadow map. No striping on walls at t = 0.5 or 0.64 and no visible seam from the air, so `sunLight()` was left alone.
+- **4A.5 Landmarks by day.** Burj Khalifa's glass mirrored the sand under the camera; landmark glass can now mirror the sky it faces, and each tier ends in a dark band. Cayan: stronger columns and a dark recess up each corner, so the twist reads. Museum chip view from below the void. Roofs over 5000 m² (Dubai Mall is 247,000 m²) carry large low volumes. Glass towers differ in tint and reflectance.
+- **4A.6 Tour.** Opening 1.3 km from Ain Dubai instead of 2.4 km; the leg over empty sea to Burj Al Arab is lower, has one more keyframe and passes at 760 m; over the fountain lake the whole spire is in frame. Still 54 s, top speed 1020 m/s (was 1212).
+- **4A.7 Low quality.** Same pipeline as High with DPR 1, no contact shading, shadow map every 8th frame, no tree shadows or roof plant, props at 35% reach. A device that cannot hold it at the governor's smallest scale drops to the old bare mode. This was the owner's decision to make; it is the default taken in their absence.
+- **4A.8 Stretch.** Dubai Fountain only: 46 jets on the Burj lake, one draw call. Atlantis arch and Metro piers not done.
+
+**Frame time, back to back.** GPU time per frame from `EXT_disjoint_timer_query_webgl2`, 1920x1080, mean of 16 frames at tour seconds 0, 9, 17, 27, 35, 44, 54, the old commit (c7f45c9) and the new code in two tabs of the same browser, read alternately:
+
+| | 0 | 9 | 17 | 27 | 35 | 44 | 54 |
+|---|---|---|---|---|---|---|---|
+| v0.1.0 (c7f45c9) | 12.1 | 16.0 | 13.1 | 12.5 | 12.7 | 12.9 | 14.8 |
+| after 4A.8 | 12.4 | 14.5 | 11.6 | 10.7 | 12.6 | 13.3 | 15.8 |
+
+No slower within the noise (about ±1.5 ms between readings of the same code). The tour keyframes at 0, 27 and 44 s moved in 4A.6, so those columns compare slightly different views. Low: about 8.8 ms against 15.3 ms for High at two fixed views (old Low about 5.5 ms).
+
+**How it was measured, and why not the way PLAN.md says:**
+- `git stash` was not used. A Phase 4B chat was working in the same folder for the first two tasks; stashing would have taken its uncommitted work away. The old commit was checked out as a second worktree in a temp folder and served on another port instead.
+- The preview pane was hidden for the whole session, so wall-clock frame times were capped at 16.6 ms or doubled by contention (one spot read 18 and 32 ms minutes apart). GPU timer queries were steady once the other chat had finished. These are GPU times, not frame times: they leave out JavaScript and presentation, so do not compare them with the 13 to 19 ms in the earlier sections.
+- Not measured: a real run of the tour on a visible window, and the governor's scale during it. That is still to do on the owner's laptop with `?perf`.
+
+**What went wrong:**
+- The first version of 4A.1 turned glass towers into zebra stripes: office floors were lit across their whole width, and a faithful blur of a bar is a bar. The fix was in the near pattern, not the far one.
+- The baseline tab rendered at 1024x768 while the working tab rendered at 1920x1080 (a background tab does not get the resize event), which made the new code look twice as slow for one reading.
+- Edits to `buildingMesh.js` did not reload the page: it is imported only by the worker. The mall roof looked unchanged until a manual reload.
+- The first Low measurement was taken at render scale 0.82, left by the governor during loading.
+
+**Not done, or still weak:**
+- At blue hour some glass towers turn saturated magenta (a warm-tinted glass reflecting the sunset sky).
+- Bridge piers are plain square columns and overlapping ways each bring their own, so some interchanges are crowded with them. Decks in a neighbouring tile are not known to the palm and car filters.
+- Shadows beyond the box are still the soft height-map ones.
+- Burj Khalifa close up at night shows lit rooms as a grid of squares.
+- Low's new cost has only been measured on this machine's GPU; phones are untested.

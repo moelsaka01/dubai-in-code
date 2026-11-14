@@ -337,15 +337,15 @@ How to measure: frame time at 1920x1080 on the owner's Intel Iris Xe is 13 to 19
 
 What the owner has said, in order: it lagged; it looked like Lego; everything except the sea looked fake; the target is a film-like aerial shot of a clean architectural model; day is now better, the evening needed definition, night looked fake. Lessons that cost a pass each: patterns (random per-window values, painted bays) read as a printed texture, smooth light reads as real; more objects did not help, better light did; never evaluate noise per reflected pixel; never feed an unclamped varying to `exp()`.
 
-- [ ] 4A.1 Night from the air. At 1 to 4 km lit windows are blocks of 6 bays by 2 floors. Find something that reads as windows at that distance. `src/shaders/building.glsl.js`, the night block.
-- [ ] 4A.2 Tower lighting at night. The crown bands just follow tier tops. A few towers need facade or edge lighting; check all five landmarks at night (Burj Khalifa's pattern, Burj Al Arab's fabric, Cayan). `src/shaders/building.glsl.js`, `src/landmarks/*.js`.
-- [ ] 4A.3 Roads in three dimensions. A raised bridge that continues in the next tile ramps down at the tile edge. Motorways and the Metro are flat. Standing cars stay under raised decks, palms stand on bridge approaches. `buildRoads()` and `buildProps()` in `src/data/tileWorker.js`, `src/world/roads.js`, `src/world/traffic.js`.
-- [ ] 4A.4 Shadows. Sharp only inside the box around the camera, soft beyond it; look at the seam. Trees and bridge decks cast none. Check for striping on walls at low sun. `src/world/sunShadow.js`, `sunLight()` in `src/shaders/common.glsl.js`.
-- [ ] 4A.5 Landmarks by day. Burj Khalifa is plain from far away. The Museum of the Future's proportions and script. Cayan's twist does not read from its chip view. Dubai Mall is one flat slab beside Burj Khalifa.
-- [ ] 4A.6 Tour framing and timing (54 s). Look at every keyframe at the time of day the tour reaches it. `src/camera/tour.js`; `npm run check` guards clearance.
-- [ ] 4A.7 Low quality has no crisp shadows, contact shading, bloom or grade, so it looks like a different app. Decide what it keeps.
-- [ ] 4A.8 Stretch, only if the rest is done: Dubai Fountain on the Burj lake at night, Atlantis arch, Metro viaduct.
-- [ ] 4A.9 Update `BUILD_LOG.md` (what the screenshots showed, what changed, frame time back to back) and tick these boxes.
+- [x] 4A.1 Night from the air. At 1 to 4 km lit windows are blocks of 6 bays by 2 floors. Find something that reads as windows at that distance. `src/shaders/building.glsl.js`, the night block.
+- [x] 4A.2 Tower lighting at night. The crown bands just follow tier tops. A few towers need facade or edge lighting; check all five landmarks at night (Burj Khalifa's pattern, Burj Al Arab's fabric, Cayan). `src/shaders/building.glsl.js`, `src/landmarks/*.js`.
+- [x] 4A.3 Roads in three dimensions. A raised bridge that continues in the next tile ramps down at the tile edge. Motorways and the Metro are flat. Standing cars stay under raised decks, palms stand on bridge approaches. `buildRoads()` and `buildProps()` in `src/data/tileWorker.js`, `src/world/roads.js`, `src/world/traffic.js`.
+- [x] 4A.4 Shadows. Sharp only inside the box around the camera, soft beyond it; look at the seam. Trees and bridge decks cast none. Check for striping on walls at low sun. `src/world/sunShadow.js`, `sunLight()` in `src/shaders/common.glsl.js`.
+- [x] 4A.5 Landmarks by day. Burj Khalifa is plain from far away. The Museum of the Future's proportions and script. Cayan's twist does not read from its chip view. Dubai Mall is one flat slab beside Burj Khalifa.
+- [x] 4A.6 Tour framing and timing (54 s). Look at every keyframe at the time of day the tour reaches it. `src/camera/tour.js`; `npm run check` guards clearance.
+- [x] 4A.7 Low quality has no crisp shadows, contact shading, bloom or grade, so it looks like a different app. Decide what it keeps. Taken without the owner: Low keeps shadows, bloom and grade, drops contact shading, pixels and distance (`QUALITY` in `src/app.js`). Confirm or change.
+- [x] 4A.8 Stretch, only if the rest is done: Dubai Fountain on the Burj lake at night, Atlantis arch, Metro viaduct. Done: the fountain. Not done: Atlantis arch, Metro piers (rail bridges were raised in 4A.3).
+- [x] 4A.9 Update `BUILD_LOG.md` (what the screenshots showed, what changed, frame time back to back) and tick these boxes.
 
 Prompt for the chat (Fable 5.2):
 

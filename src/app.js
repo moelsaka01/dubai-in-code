@@ -11,6 +11,7 @@ import { createProps } from './world/props.js';
 import { createCityMap } from './world/cityMap.js';
 import { createSunShadow } from './world/sunShadow.js';
 import { createClouds } from './world/clouds.js';
+import { createFountain } from './world/fountain.js';
 import { createLandmarks } from './landmarks/index.js';
 import { openCity } from './data/loader.js';
 import { createControls } from './camera/controls.js';
@@ -92,7 +93,8 @@ export function createApp(canvas) {
   const buildings = createBuildings(env);
   const roads = createRoads(env);
   const props = createProps(env);
-  scene.add(sky.object, water.object, land.object, roads.object, roads.casters, buildings.object, props.object);
+  const fountain = createFountain(env);
+  scene.add(sky.object, water.object, land.object, roads.object, roads.casters, buildings.object, props.object, fountain.object);
   let traffic = null, landmarks = null;
 
   const post = createPost(renderer, scene, camera);
@@ -264,7 +266,7 @@ export function createApp(canvas) {
       // their shadows are under a pixel and the pass would draw every tree in view for nothing.
       const trees = q.treeShadows && sunShadow.half < TREE_SHADOW_HALF;
       if (trees) props.castOnly(); // props.update() below restores the cars and boats
-      const hide = [sky.object, water.object, land.object, roads.object, traffic.object, buildings.beacons.object];
+      const hide = [sky.object, water.object, land.object, roads.object, traffic.object, buildings.beacons.object, fountain.object];
       if (!trees) hide.push(props.object);
       sunShadow.update(scene, camera, hide, buildings, [roads.casters], q.shadowEvery);
     }
@@ -273,6 +275,7 @@ export function createApp(canvas) {
     props.object.visible = q.props > 0;
     if (q.props > 0) props.update(camera, q.props);
     roads.update(camera, q.minorFar);
+    fountain.update(camera);
     if (traffic) traffic.update(dt);
     if (landmarks) landmarks.update(dt);
     cityMap.update();
@@ -313,7 +316,7 @@ export function createApp(canvas) {
       : `${count} buildings from OpenStreetMap. Drag to orbit, scroll to zoom, WASD to fly.`);
     // Height, shadow and occlusion maps: every tile at full detail, without the layers that are not ground or buildings.
     buildings.update(camera, Infinity);
-    cityMap.render(scene, [sky.object, water.object, roads.object, traffic.object, buildings.beacons.object, props.object]);
+    cityMap.render(scene, [sky.object, water.object, roads.object, traffic.object, buildings.beacons.object, props.object, fountain.object]);
     props.addBoats(cityMap.waterMask());
     props.build();
     loaded = true;

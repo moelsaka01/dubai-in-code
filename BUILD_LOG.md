@@ -263,4 +263,6 @@ No slower within the noise (about ±1.5 ms between readings of the same code). T
 
 **Done:** README (what it is, how it was built, run, check, rebuild data, deploy, ODbL notice), `.github/workflows/deploy.yml` (check, build, publish `dist/` to GitHub Pages on push to `main` or `master`), the cost table above, `LAUNCH.md`.
 
-**Not done / needs the owner:** the repository has no remote, so the workflow has never run. Create the GitHub repo, push, and set Pages > Source to "GitHub Actions". The branch is `master` and the plan says `main`; the workflow accepts both. Fable 5.2 cache prices are unconfirmed (see Cost method). The clip in `LAUNCH.md` still has to be recorded.
+**Deployed:** https://github.com/moelsaka01/dubai-in-code, live at https://moelsaka01.github.io/dubai-in-code/. The first run failed only because Pages was not enabled; enabling it with the Actions source and re-running went green.
+
+**Not done / needs the owner:** the branch is `master` and the plan says `main`; the workflow accepts both. Fable 5.2 cache prices are unconfirmed (see Cost method). The clip in `LAUNCH.md` still has to be recorded.

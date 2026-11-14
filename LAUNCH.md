@@ -12,7 +12,7 @@ I wanted to see how far "only map data and code" goes. Dubai Marina to Downtown,
 
 The hard part was not geometry. Three review rounds of "it looks fake" ended when the fix turned out to be better light and fewer patterns, not more objects.
 
-Try it: <live URL>. Code and the full build log with costs: <repo URL>. Map data © OpenStreetMap contributors (ODbL).
+Try it: https://moelsaka01.github.io/dubai-in-code/. Code and the full build log with costs: https://github.com/moelsaka01/dubai-in-code. Map data © OpenStreetMap contributors (ODbL).
 
 ## Clip plan (15 to 20 s, 1080p, no UI)
 
@@ -27,7 +27,7 @@ Tools: OBS or the Windows Game Bar at 60 fps, then trim and make a GIF (under 8 
 
 ## Before posting
 
-- [ ] Push, enable Pages, confirm the live URL loads and shows the credit.
+- [x] Push, enable Pages, confirm the live URL loads and shows the credit (done 2026-11-14: workflow green, page and data files return 200).
 - [ ] Open it on a phone (the Low quality path is untested on real devices).
 - [ ] Confirm Fable 5.2 cache prices, or say the cost is an estimate.
 - [ ] Mention the OSM credit and licence in the post.

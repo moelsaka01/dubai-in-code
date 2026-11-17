@@ -14,7 +14,8 @@ import path from 'node:path';
 // Sonnet 5.5: $2 / $10, cache read $0.10 (since 2026-10-07; was $0.20), 5m write $2.50, 1h write $4, per Anthropic's pricing docs (checked 2026-11-14).
 const PRICES = { 'claude-fable-5-2': [8, 40], 'claude-sonnet-5-5': [2, 10] };
 // Cache-read price as a multiple of the input price, where it differs from CACHE_READ.
-const CACHE_READ_BY_MODEL = { 'claude-sonnet-5-5': 0.05 };
+// Fable 5.2: cache read $0.20/MTok on an $8 input price = 0.025.
+const CACHE_READ_BY_MODEL = { 'claude-sonnet-5-5': 0.05, 'claude-fable-5-2': 0.025 };
 // Assumed cache multipliers on the input price. Check current pricing before publishing a number.
 const CACHE_READ = 0.1;
 const CACHE_WRITE_5M = 1.25;
@@ -57,7 +58,9 @@ for (const file of files) {
     }
     const usage = row.message?.usage;
     if (row.type === 'assistant' && usage) {
-      byMessage.set(row.message.id ?? row.uuid, { model: row.message.model ?? 'unknown', usage });
+      // Dedupe on message.id + requestId: streamed lines repeat per request, keep the last.
+      const key = row.message.id && row.requestId ? `${row.message.id}:${row.requestId}` : (row.message.id ?? row.uuid);
+      byMessage.set(key, { model: row.message.model ?? 'unknown', usage });
     }
   }
 

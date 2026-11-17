@@ -26,23 +26,25 @@ API-equivalent cost = input × P_in + output × P_out + cache read × 0.1 × P_i
 | Claude Fable 5.2 | 8 | 40 | given in the project brief |
 | Claude Sonnet 5.5 | 2 | 10 | Anthropic pricing docs, checked 2026-11-14: cache read $0.10 per M (cut from $0.20 on 2026-10-07, so 0.05 x input), 5-minute write $2.50, 1-hour write $4 |
 
-Cache multipliers live in `scripts/usage.mjs`. Sonnet 5.5's are confirmed above. **Fable 5.2's cache rates were not found** and still use the standard 0.1 / 1.25 / 2 multipliers; cache reads are most of its volume, so treat the Fable figures as an estimate until checked against the pricing page.
+Cache multipliers live in `scripts/usage.mjs`. Sonnet 5.5's are confirmed above. Fable 5.2's cache read is $0.20 per M (0.025 x input), set 2026-11-17. Its cache-write rates were not confirmed and still use the standard 1.25 / 2 multipliers; writes are about 3% of its token volume, so the Fable figures are close but not exact until that is checked.
+
+Usage is deduplicated per `message.id` + `requestId` (last line kept) before summing. Checked 2026-11-17: this changed no token counts, because the transcripts hold one distinct id per request.
 
 ## Phases
 
 | Phase | Model | Prompts | Time | Input | Output | Cache read | Cache write | API-equivalent |
 |---|---|---|---|---|---|---|---|---|
-| 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $5.31 |
+| 1 Plan and skeleton | Fable 5.2 | 2 | ~41 min | 40 | 54,001 | 2,178,702 | 87,950 | $4.00 |
 | 2 Data pipeline | Sonnet 5.5 | 8 | ~526 min wall clock | 112 | 75,598 | 6,760,624 | 373,234 | $2.93 |
-| 3 Rendering and landmarks, with four review passes (v0.1.0) | Fable 5.2 | 9 | ~19 h wall clock | 332 | 540,523 | 77,123,002 | 2,689,225 | $126.35 |
+| 3 Rendering and landmarks, with four review passes (v0.1.0) | Fable 5.2 | 9 | ~19 h wall clock | 332 | 540,523 | 77,123,002 | 2,689,225 | $80.08 |
 | 4B Small fixes | Sonnet 5.5 | 2 | ~824 min wall clock (idle gaps) | 98 | 29,510 | 5,763,371 | 215,162 | $1.73 |
-| 4A Visual bugs | Fable 5.2 | 3 | ~823 min wall clock (idle gaps) | 214 | 134,479 | 29,234,807 | 828,092 | $42.02 |
-| 5 README, deploy, launch | Sonnet 5.5 | 1 | | 14 | 2,054 | 637,404 | 68,060 | $0.36 so far |
-| **Total** | | 25 | | | | | | **$178.69** |
+| 4A Visual bugs | Fable 5.2 | 3 | ~823 min wall clock (idle gaps) | 214 | 134,479 | 29,234,807 | 828,092 | $24.48 |
+| 5 README, deploy, launch | Sonnet 5.5 | 10 | ~3,043 min wall clock (idle gaps) | 166 | 40,381 | 10,879,751 | 226,681 | $2.40 |
+| **Total** | | 34 | | | | | | **$115.62** |
 
-Re-read on 2026-11-14 with `npm run usage`; these supersede earlier figures (Phase 2 fell from $3.60 to $2.93 because Sonnet's cache-read rate is $0.10, not $0.20). Phase 5 was measured from inside its own session and misses its last turns.
+Re-read on 2026-11-17 with `npm run usage`; these supersede earlier figures. Fable phases fell (Phase 1 $5.31 to $4.00, Phase 3 $126.35 to $80.08, Phase 4A $42.02 to $24.48) because its cache read is $0.20 per M, not $0.80. Phase 5 is now the finished session (it was $0.36 mid-session); the figure excludes the later session that made this correction (about $0.14).
 
-**Headline:** about **$179** at API-equivalent prices for the whole project (Fable 5.2 $173.68, Sonnet 5.5 $5.02), 25 prompts over three days. Phase 3, with its four rounds of "it looks fake", was 70% of it. This is what the same tokens would cost through the API, not what was paid on a subscription.
+**Headline:** about **$116** at API-equivalent prices for the whole project (Fable 5.2 $108.56, Sonnet 5.5 $7.06), 34 prompts over three days. Phase 3, with its four rounds of "it looks fake", was 69% of it. This is what the same tokens would cost through the API, not what was paid on a subscription.
 
 ### Phase 1 — plan and skeleton (2026-11-12)
 
@@ -174,7 +176,7 @@ The owner looked at the screenshots from the lighting pass: day better, evening 
 
 ### Version 0.1.0 accepted (2026-11-13)
 
-The owner accepted the state after the evening and night pass as version 0.1.0: "I will allow it for a 0.1.0 version". Not praise, a stopping point. Phase 3 took one build and four review passes, nine prompts and about $122 at API-equivalent prices, against roughly $20 for the first build alone. Most of that was spent finding out what "fake" meant: the first two passes answered a different question (lag, then missing detail) from the one that mattered (light and patterns).
+The owner accepted the state after the evening and night pass as version 0.1.0: "I will allow it for a 0.1.0 version". Not praise, a stopping point. Phase 3 took one build and four review passes, nine prompts and about $80 at API-equivalent prices (first figure was $122 with the old cache rate), against roughly $20 for the first build alone (not recomputed). Most of that was spent finding out what "fake" meant: the first two passes answered a different question (lag, then missing detail) from the one that mattered (light and patterns).
 
 What carried over to Phase 4 is in PLAN.md §5, split in two chats: 4B small fixes for Sonnet 5.5 (perf overlay, URL parameters, touch, messages, housekeeping) and 4A visual bugs for Fable 5.2 (night from the air, tower lighting, roads in three dimensions, shadow seam, landmarks by day, tour framing, Low quality). Each has its prompt in the plan.
 
@@ -265,4 +267,4 @@ No slower within the noise (about ±1.5 ms between readings of the same code). T
 
 **Deployed:** https://github.com/moelsaka01/dubai-in-code, live at https://moelsaka01.github.io/dubai-in-code/. The first run failed only because Pages was not enabled; enabling it with the Actions source and re-running went green.
 
-**Not done / needs the owner:** the branch is `master` and the plan says `main`; the workflow accepts both. Fable 5.2 cache prices are unconfirmed (see Cost method). The clip in `LAUNCH.md` still has to be recorded.
+**Not done / needs the owner:** the branch is `master` and the plan says `main`; the workflow accepts both. Fable 5.2 cache-write prices are unconfirmed (see Cost method). The clip in `LAUNCH.md` still has to be recorded.
